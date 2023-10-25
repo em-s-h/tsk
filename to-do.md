@@ -5,8 +5,8 @@ lists manager
 list file
 
 # feat
-- create a list;
-- delete a list;
+- [x] create a list;
+- [x] delete a list;
 - print lists;
 - add item to a list;
 - remove item from a list;
