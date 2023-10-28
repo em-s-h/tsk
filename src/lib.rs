@@ -1,5 +1,4 @@
 use clap::Parser;
-use std::{fs::File, process};
 
 mod lists;
 
@@ -12,7 +11,7 @@ pub struct Args {
     // {{{
     /// Name of the list to operate on.
     /// Pass without flags to print the list
-    #[arg(required = true)]
+    #[arg(required = true, index = 1)]
     pub list_name: String,
 
     /// Create a list
@@ -23,20 +22,20 @@ pub struct Args {
     #[arg(short, long, required = false)]
     pub delete: bool,
 
-    /// The id of an item, used when removing, moving or editing
-    #[arg(required = false, index = 2)]
-    pub id: u8,
-
     /// The item to add to a list
-    #[arg(required = false)]
+    #[arg(index = 2, default_value = "-")]
     pub item: String,
 
+    /// The id of an item, used when removing, moving or editing
+    #[arg(index = 3, default_value_t = 0)]
+    pub id: u8,
+
     /// Add an item to a list
-    #[arg(short, long, required = false, index = 1)]
+    #[arg(short, long, required = false)]
     pub add: bool,
 
     /// Remove an item from a list
-    #[arg(short, long, required = false, index = 0)]
+    #[arg(short, long, required = false)]
     pub remove: bool,
 
     /// Don't ask for confirmation when deleting or removing
@@ -47,10 +46,8 @@ pub struct Args {
 
 pub fn run(args: Args) {
     // {{{
-    let list: File;
-
     if args.create {
-        list = lists::create_list(&args.list_name);
+        lists::create_list(&args.list_name);
     } else if args.delete {
         lists::delete_list(&args.list_name, args.no_confirmation);
     } else {
@@ -59,41 +56,8 @@ pub fn run(args: Args) {
     // }}}
 }
 
-pub fn check_args(args: Args) -> Args {
-    // {{{
-    args
-    // }}}
-}
-
 #[cfg(test)]
 mod test {
     // // {{{
-    // use crate::{check_args, Args};
-    //
-    // // check_args {{{
-    // #[test]
-    // fn check_args_success() {
-    //     let messy_args = Args {
-    //         list_name: "aa".to_string(),
-    //         create: true,
-    //         delete: false,
-    //         add: None,
-    //         remove: None,
-    //         no_confirmation: false,
-    //     };
-    //
-    //     let correct_args = Args {
-    //         list_name: "aa".to_string(),
-    //         create: true,
-    //         delete: false,
-    //         add: None,
-    //         remove: None,
-    //         no_confirmation: false,
-    //     };
-    //
-    //     assert_eq!(correct_args, check_args(messy_args));
-    // }
-    // // }}}
-    //
     // // }}}
 }

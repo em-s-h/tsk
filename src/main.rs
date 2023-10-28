@@ -16,6 +16,5 @@ fn main() {
         process::exit(1);
     }
 
-    println!("{:?}", args);
-    // clist::run(args);
+    clist::run(args);
 }
