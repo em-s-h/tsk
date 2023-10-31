@@ -11,8 +11,8 @@ fn main() {
         .replace([' ', '\n', '\t'], "")
         .to_owned();
 
-    if args.create && args.delete {
-        eprintln!("Cannot create and delete a list at the same time!");
+    if args.create && args.remove {
+        eprintln!("Cannot create and remove a list at the same time!");
         process::exit(1);
     }
 

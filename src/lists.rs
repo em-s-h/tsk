@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, BufWriter},
     path::Path,
     process,
 };
@@ -20,15 +20,12 @@ pub fn create_list(name: &str) {
     // }}}
 }
 
-pub fn delete_list(name: &str, is_confirmed: bool) {
+pub fn remove_list(name: &str, is_confirmed: bool) {
     // {{{
     use std::io::{self, Write};
 
     let path = get_path(name);
-    if !list_exists(&path) {
-        eprintln!("This list doesn't exist!");
-        process::exit(1);
-    }
+    check_list(&path);
 
     if !is_confirmed {
         println!("Are you sure you want to delete {}?", name);
@@ -48,7 +45,7 @@ pub fn delete_list(name: &str, is_confirmed: bool) {
     }
 
     if let Err(e) = fs::remove_file(path) {
-        eprintln!("Unable to delete list, please make sure the list exists.");
+        eprintln!("Unable to delete list.");
         eprintln!("Error: {e}");
         process::exit(1);
     } else {
@@ -60,27 +57,41 @@ pub fn delete_list(name: &str, is_confirmed: bool) {
 pub fn print_list(name: &str) {
     // {{{
     let path = get_path(name);
-    if !list_exists(&path) {
-        eprintln!("This list doesn't exist!");
-        process::exit(1);
-    }
+    check_list(&path);
     println!("[{name}]");
 
     let file = File::open(path).expect("Unable to open file.");
-    let mut reader = BufReader::new(file);
-    let mut buffer = String::new();
+    let reader = BufReader::new(file);
+    let mut id: u8 = 0;
 
-    loop {
-        if let Ok(b) = reader.read_line(&mut buffer) {
-            if b == 0 {
-                break;
-            }
+    for l in reader.lines().map(|l| l.unwrap_or_default()) {
+        id += 1;
+        print!("{}. {}", id, l);
+    }
+    // }}}
+}
 
-            print!("{}", buffer);
-            buffer.clear();
-        } else {
-            panic!("Unable to read file {}", name);
-        }
+pub fn add_item(name: &str, item: &str) {
+    // {{{
+    let path = get_path(name);
+    check_list(&path);
+
+    let list = File::open(path).expect("Unable to open file.");
+    // }}}
+}
+
+pub fn delete_item(name: &str, id: u8) {
+    // {{{
+
+    // }}}
+}
+
+/// Check if the list exists and warn the user
+fn check_list(path: &str) {
+    // {{{
+    if !list_exists(&path) {
+        eprintln!("This list doesn't exist!");
+        process::exit(1);
     }
     // }}}
 }
@@ -103,9 +114,9 @@ fn get_path(name: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use std::path::Path;
-
+    // {{{
     use super::*;
+    use std::path::Path;
 
     // {{{
     #[test]
@@ -117,12 +128,13 @@ mod test {
     }
 
     #[test]
-    fn delete_list_ok() {
+    fn remove_list_ok() {
         create_list_ok();
-        delete_list(&"test", true);
+        remove_list(&"test", true);
         let exists = Path::new(&get_path("test")).try_exists().unwrap();
 
         assert!(!exists);
     }
+    // }}}
     // }}}
 }

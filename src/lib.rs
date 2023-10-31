@@ -18,25 +18,17 @@ pub struct Args {
     #[arg(short, long, required = false)]
     pub create: bool,
 
-    /// Delete a list
-    #[arg(short, long, required = false)]
-    pub delete: bool,
-
-    /// The item to add to a list
-    #[arg(index = 2, default_value = "-")]
-    pub item: String,
-
-    /// The id of an item, used when removing, moving or editing
-    #[arg(index = 3, default_value_t = 0)]
-    pub id: u8,
-
-    /// Add an item to a list
-    #[arg(short, long, required = false)]
-    pub add: bool,
-
-    /// Remove an item from a list
+    /// Remove a list
     #[arg(short, long, required = false)]
     pub remove: bool,
+
+    /// Add an item to a list
+    #[arg(short, long, required = false, default_value = "")]
+    pub add: String,
+
+    /// Delete an item from a list
+    #[arg(short, long, required = false, default_value_t = 0)]
+    pub delete: u8,
 
     /// Don't ask for confirmation when deleting or removing
     #[arg(long, required = false)]
@@ -48,11 +40,17 @@ pub fn run(args: Args) {
     // {{{
     if args.create {
         lists::create_list(&args.list_name);
-    } else if args.delete {
-        lists::delete_list(&args.list_name, args.no_confirmation);
-    } else {
-        lists::print_list(&args.list_name);
+    } else if args.remove {
+        lists::remove_list(&args.list_name, args.no_confirmation);
     }
+
+    if !args.add.is_empty() {
+        lists::add_item(&args.list_name, &args.add);
+    } else if args.delete != 0 {
+        lists::delete_item(&args.list_name, args.delete);
+    }
+
+    lists::print_list(&args.list_name);
     // }}}
 }
 
