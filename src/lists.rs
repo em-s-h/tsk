@@ -1,6 +1,6 @@
 use std::{
-    fs::{self, File},
-    io::{BufRead, BufReader, BufWriter},
+    fs::{self, File, OpenOptions},
+    io::{self, BufRead, BufReader, BufWriter, Write},
     path::Path,
     process,
 };
@@ -17,13 +17,11 @@ pub fn create_list(name: &str) {
     }
 
     File::create(path).expect("Unable to create file");
-    // }}}
 }
+// }}}
 
 pub fn remove_list(name: &str, is_confirmed: bool) {
     // {{{
-    use std::io::{self, Write};
-
     let path = get_path(name);
     check_list(&path);
 
@@ -48,17 +46,15 @@ pub fn remove_list(name: &str, is_confirmed: bool) {
         eprintln!("Unable to delete list.");
         eprintln!("Error: {e}");
         process::exit(1);
-    } else {
-        process::exit(0);
     }
-    // }}}
 }
+// }}}
 
 pub fn print_list(name: &str) {
     // {{{
     let path = get_path(name);
     check_list(&path);
-    println!("[{name}]");
+    println!("List: [ {name} ]\n");
 
     let file = File::open(path).expect("Unable to open file.");
     let reader = BufReader::new(file);
@@ -66,25 +62,31 @@ pub fn print_list(name: &str) {
 
     for l in reader.lines().map(|l| l.unwrap_or_default()) {
         id += 1;
-        print!("{}. {}", id, l);
+        println!("{}. {}", id, l);
     }
-    // }}}
 }
+// }}}
 
 pub fn add_item(name: &str, item: &str) {
     // {{{
+    let item = item.to_string() + "\n";
     let path = get_path(name);
     check_list(&path);
 
-    let list = File::open(path).expect("Unable to open file.");
-    // }}}
+    let mut list = OpenOptions::new()
+        .append(true)
+        .open(path)
+        .expect("Unable to open file for writting");
+
+    list.write_all(item.as_bytes())
+        .expect("Unable to write to file");
 }
+// }}}
 
 pub fn delete_item(name: &str, id: u8) {
     // {{{
-
-    // }}}
 }
+// }}}
 
 /// Check if the list exists and warn the user
 fn check_list(path: &str) {
@@ -93,8 +95,8 @@ fn check_list(path: &str) {
         eprintln!("This list doesn't exist!");
         process::exit(1);
     }
-    // }}}
 }
+// }}}
 
 fn list_exists(path: &str) -> bool {
     // {{{
@@ -105,8 +107,8 @@ fn list_exists(path: &str) -> bool {
         eprintln!("Unable to verify the existence of file");
         false
     }
-    // }}}
 }
+// }}}
 
 fn get_path(name: &str) -> String {
     format!("{}{}", LISTS_DIR, name)
@@ -116,25 +118,49 @@ fn get_path(name: &str) -> String {
 mod test {
     // {{{
     use super::*;
-    use std::path::Path;
 
-    // {{{
     #[test]
     fn create_list_ok() {
+        // {{{
         create_list(&"test");
         let exists = Path::new(&get_path("test")).try_exists().unwrap();
 
-        assert!(exists);
+        remove_list(&"test", true);
+        assert_eq!(exists, true)
     }
+    // }}}
 
     #[test]
     fn remove_list_ok() {
-        create_list_ok();
-        remove_list(&"test", true);
-        let exists = Path::new(&get_path("test")).try_exists().unwrap();
+        // {{{
+        create_list(&"t1");
+        remove_list(&"t1", true);
+        let exists = Path::new(&get_path("t1")).try_exists().unwrap();
 
         assert!(!exists);
     }
     // }}}
+
+    #[test]
+    fn add_item_ok() {
+        // {{{
+        add_item(&"t2", &"new item");
+
+        let f = File::open(&get_path("t2")).unwrap();
+        let last_line = BufReader::new(f)
+            .lines()
+            .map(|l| l.unwrap())
+            .last()
+            .unwrap();
+
+        assert_eq!(last_line, "new item");
+    }
     // }}}
+
+    #[test]
+    #[ignore = "Use only with '--show-output'"]
+    fn print_list_ok() {
+        print_list(&"t2");
+    }
 }
+// }}}

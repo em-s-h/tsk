@@ -23,11 +23,11 @@ pub struct Args {
     pub remove: bool,
 
     /// Add an item to a list
-    #[arg(short, long, required = false, default_value = "")]
+    #[arg(short, long, required = false, name = "item", default_value = "")]
     pub add: String,
 
     /// Delete an item from a list
-    #[arg(short, long, required = false, default_value_t = 0)]
+    #[arg(short, long, required = false, name = "item_id", default_value_t = 0)]
     pub delete: u8,
 
     /// Don't ask for confirmation when deleting or removing
@@ -40,14 +40,18 @@ pub fn run(args: Args) {
     // {{{
     if args.create {
         lists::create_list(&args.list_name);
+        println!("List created");
     } else if args.remove {
         lists::remove_list(&args.list_name, args.no_confirmation);
+        println!("List deleted");
     }
 
     if !args.add.is_empty() {
         lists::add_item(&args.list_name, &args.add);
+        println!("Item added");
     } else if args.delete != 0 {
         lists::delete_item(&args.list_name, args.delete);
+        println!("Item removed");
     }
 
     lists::print_list(&args.list_name);
