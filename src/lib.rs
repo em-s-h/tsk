@@ -1,3 +1,5 @@
+use std::process;
+
 use clap::Parser;
 
 mod lists;
@@ -38,23 +40,26 @@ pub struct Args {
 
 pub fn run(args: Args) {
     // {{{
+    let path = lists::get_path(&args.list_name);
+
     if args.create {
-        lists::create_list(&args.list_name);
+        lists::create_list(&path);
         println!("List created");
     } else if args.remove {
-        lists::remove_list(&args.list_name, args.no_confirmation);
+        lists::remove_list(&path, &args.list_name, args.no_confirmation);
         println!("List deleted");
+        process::exit(0);
     }
 
     if !args.add.is_empty() {
-        lists::add_item(&args.list_name, &args.add);
+        lists::add_item(&path, &args.add);
         println!("Item added");
     } else if args.delete != 0 {
-        lists::delete_item(&args.list_name, args.delete);
+        lists::delete_item(&path, args.delete);
         println!("Item removed");
     }
 
-    lists::print_list(&args.list_name);
+    lists::print_list(&path, &args.list_name);
     // }}}
 }
 

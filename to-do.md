@@ -1,16 +1,10 @@
-# What
-lists manager
-
-# how
-list file
-
 # feat
 - [x] create a list;
 - [x] delete a list;
 - print lists;
-- add item to a list;
+- [x] add item to a list;
 - remove item from a list;
-- print items of a list;
+- [x] print items of a list;
 
 ## future feat
 - bulk add;
