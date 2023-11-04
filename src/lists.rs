@@ -5,8 +5,18 @@ use std::{
     process,
 };
 
-// const LISTS_DIR: &str = "~/.local/share/lists/";
-const LISTS_DIR: &str = "./lists/"; // For debugging
+use crate::LISTS_DIR;
+
+pub fn show_lists() {
+    let dir = LISTS_DIR;
+
+    let entries = fs::read_dir(dir).expect("Unable to read the contents of the lists directory");
+    for entry in entries {
+        let entry = entry.unwrap().file_name();
+        let entry = entry.to_str().expect("Unable to convert OsString to str");
+        println!("{entry}");
+    }
+}
 
 pub fn create_list(path: &str) {
     // {{{
@@ -121,10 +131,6 @@ fn list_exists(path: &str) -> bool {
 }
 // }}}
 
-pub fn get_path(list: &str) -> String {
-    format!("{}{}", LISTS_DIR, list)
-}
-
 #[cfg(test)]
 mod test {
     // {{{
@@ -133,7 +139,7 @@ mod test {
     #[test]
     fn create_list_ok() {
         // {{{
-        let path = get_path("test");
+        let path = crate::get_path("test");
         create_list(&path);
         let exists = Path::new(&path).try_exists().unwrap();
 
@@ -145,7 +151,7 @@ mod test {
     #[test]
     fn remove_list_ok() {
         // {{{
-        let path = get_path("t1");
+        let path = crate::get_path("t1");
         create_list(&path);
         remove_list(&path, "t1", true);
         let exists = Path::new(&path).try_exists().unwrap();
@@ -157,7 +163,7 @@ mod test {
     #[test]
     fn add_item_ok() {
         // {{{
-        let path = get_path("t2");
+        let path = crate::get_path("t2");
         add_item(&path, &"new item");
 
         let f = File::open(&path).unwrap();
@@ -174,7 +180,7 @@ mod test {
     #[test]
     fn delete_item_ok() {
         // {{{
-        let path = get_path("t3");
+        let path = crate::get_path("t3");
         add_item(&path, &"new item");
         delete_item(&path, 8);
 
@@ -192,7 +198,13 @@ mod test {
     #[test]
     #[ignore = "Use only with '--show-output'"]
     fn print_list_ok() {
-        print_list(&get_path("t2"), "t2");
+        print_list(&crate::get_path("t2"), "t2");
+    }
+
+    #[test]
+    #[ignore = "Use only with '--show-output'"]
+    fn show_lists_ok() {
+        show_lists();
     }
 }
 // }}}

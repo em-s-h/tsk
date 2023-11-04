@@ -1,5 +1,5 @@
 use clap::Parser;
-use clist::Args;
+use clist::{Args, Item};
 use std::process;
 
 fn main() {
@@ -11,10 +11,20 @@ fn main() {
         .replace([' ', '\n', '\t'], "")
         .to_owned();
 
-    if args.create && args.remove {
-        eprintln!("Cannot create and remove a list at the same time!");
+    if (args.create || args.add != "n/a") && args.remove {
+        eprintln!("Cannot create or add an item and remove a list at the same time");
         process::exit(1);
     }
 
-    clist::run(args);
+    if args.list_name != "n/a" && args.show_lists {
+        args.show_lists = false;
+    }
+
+    let item = Item {
+        contents: args.add.clone(),
+        id: args.delete,
+    };
+
+    // println!("{:?}", args);
+    clist::run(args, item);
 }
