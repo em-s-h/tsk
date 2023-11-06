@@ -3,11 +3,6 @@ use std::{
     io::{BufRead, BufReader, BufWriter, Write},
 };
 
-pub struct Item {
-    pub contents: String,
-    pub id: u8,
-}
-
 pub fn add_item(path: &str, item: &str) {
     // {{{
     let item = item.to_string() + "\n";
