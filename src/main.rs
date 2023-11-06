@@ -1,5 +1,5 @@
 use clap::Parser;
-use clist::{Args, Item};
+use clist::Args;
 use std::process;
 
 fn main() {
@@ -20,11 +20,6 @@ fn main() {
         args.show_lists = false;
     }
 
-    let item = Item {
-        contents: args.add.clone(),
-        id: args.delete,
-    };
-
     // println!("{:?}", args);
-    clist::run(args, item);
+    clist::run(args);
 }

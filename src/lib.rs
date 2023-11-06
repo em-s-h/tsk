@@ -1,7 +1,8 @@
-use std::process;
-
 use clap::Parser;
+use items::Item;
+use std::{path::Path, process};
 
+mod items;
 mod lists;
 
 #[derive(Parser, Debug, PartialEq)]
@@ -41,19 +42,19 @@ pub struct Args {
     /// Default when no arguments are provided
     #[arg(long, default_value_t = true)]
     pub show_lists: bool,
-    // }}}
 }
-
-pub struct Item {
-    pub contents: String,
-    pub id: u8,
-}
+// }}}
 
 // const LISTS_DIR: &str = "~/.local/share/lists/";
 const LISTS_DIR: &str = "./lists/"; // For debugging
 
-pub fn run(args: Args, item: Item) {
+pub fn run(args: Args) {
     // {{{
+    let item = Item {
+        contents: args.add.clone(),
+        id: args.delete,
+    };
+
     let path = get_path(&args.list_name);
 
     if args.create {
@@ -66,11 +67,11 @@ pub fn run(args: Args, item: Item) {
     }
 
     if item.contents != "n/a" {
-        lists::add_item(&path, &item.contents);
+        items::add_item(&path, &item.contents);
         println!("Item added");
     }
     if item.id != 0 {
-        lists::delete_item(&path, item.id);
+        items::delete_item(&path, item.id);
         println!("Item removed");
     }
 
@@ -79,8 +80,30 @@ pub fn run(args: Args, item: Item) {
     } else {
         lists::print_list(&path, &args.list_name);
     }
-    // }}}
 }
+// }}}
+
+/// Check if the list exists and warn the user
+fn check_list(path: &str) {
+    // {{{
+    if !list_exists(&path) {
+        eprintln!("This list doesn't exist!");
+        process::exit(1);
+    }
+}
+// }}}
+
+fn list_exists(path: &str) -> bool {
+    // {{{
+    let path = Path::new(path);
+    if let Ok(exists) = path.try_exists() {
+        exists
+    } else {
+        eprintln!("Unable to verify the existence of file");
+        false
+    }
+}
+// }}}
 
 fn get_path(list: &str) -> String {
     format!("{}{}", LISTS_DIR, list)
@@ -89,5 +112,5 @@ fn get_path(list: &str) -> String {
 #[cfg(test)]
 mod test {
     // {{{
-    // }}}
 }
+// }}}
