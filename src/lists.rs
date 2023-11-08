@@ -30,11 +30,11 @@ pub fn create_list(path: &str) {
 }
 // }}}
 
-pub fn remove_list(path: &str, name: &str, is_confirmed: bool) {
+pub fn remove_list(path: &str, name: &str, confirmed: bool) {
     // {{{
     crate::check_list(&path);
 
-    if !is_confirmed {
+    if !confirmed {
         println!("Are you sure you want to delete {name}?");
         print!("(y/n): ");
 
@@ -47,14 +47,16 @@ pub fn remove_list(path: &str, name: &str, is_confirmed: bool) {
 
         if input.to_lowercase().starts_with("n") {
             println!("Aborting...");
-            process::exit(0);
+            // process::exit(0);
+            panic!("Replace with exit 0");
         }
     }
 
     if let Err(e) = fs::remove_file(path) {
         eprintln!("Unable to delete {name}.");
         eprintln!("Error: {e}");
-        process::exit(1);
+        // process::exit(1);
+        panic!("Replace with exit 1");
     }
 }
 // }}}

@@ -19,17 +19,17 @@ pub fn run(cli: Cli) {
         println!("List created");
     } else if cli.remove {
         lists::remove_list(&path, &cli.list_name, cli.no_confirmation);
-        println!("List deleted");
-        process::exit(0);
+        println!("List removed");
+        // process::exit(0);
+        panic!("Replace with exit 0");
     }
 
-    if cli.item != "n/a" {
+    if cli.add {
         items::add_item(&path, &cli.item);
         println!("Item added");
-    }
-    if cli.item_id != 0 {
+    } else if cli.delete {
         items::delete_item(&path, cli.item_id);
-        println!("Item removed");
+        println!("Item deleted");
     }
 
     if cli.show_lists {
@@ -45,7 +45,8 @@ fn check_list(path: &str) {
     // {{{
     if !list_exists(&path) {
         eprintln!("This list doesn't exist!");
-        process::exit(1);
+        // process::exit(1);
+        panic!("Replace with exit 1");
     }
 }
 // }}}

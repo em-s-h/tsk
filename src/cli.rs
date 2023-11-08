@@ -28,6 +28,9 @@ pub struct Cli {
 
     /// Show all the available lists to operate on
     pub show_lists: bool,
+
+    /// Don't ask for confirmation when removing a list
+    pub no_confirmation: bool,
 }
 // }}}
 
@@ -45,6 +48,7 @@ impl Cli {
             append: false,
             delete: false,
             show_lists: true,
+            no_confirmation: false,
         }
     }
     // }}}
@@ -119,6 +123,14 @@ fn parse_list_operations(cli: &mut Cli, args: &mut Args) {
             Cli::print_help();
         }
         cli.list_name = arg;
+    }
+
+    if cli.remove {
+        let arg = get_next_arg(args);
+
+        if arg == "y" {
+            cli.no_confirmation = true
+        }
     }
 }
 // }}}
