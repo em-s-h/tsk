@@ -1,6 +1,7 @@
 use crate::cli::Cli;
 use std::{path::Path, process};
 
+/// Handles the data of the program
 pub mod cli;
 mod items;
 mod lists;
