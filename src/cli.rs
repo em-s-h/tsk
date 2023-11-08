@@ -1,4 +1,9 @@
-use std::env::{self, Args};
+use std::{
+    env::{self, Args},
+    fs::File,
+    io::{BufRead, BufReader},
+    process,
+};
 
 pub struct Cli {
     // {{{
@@ -30,7 +35,7 @@ pub struct Cli {
     pub show_lists: bool,
 
     /// Don't ask for confirmation when removing a list
-    pub no_confirmation: bool,
+    pub confirmed: bool,
 }
 // }}}
 
@@ -48,7 +53,7 @@ impl Cli {
             append: false,
             delete: false,
             show_lists: true,
-            no_confirmation: false,
+            confirmed: false,
         }
     }
     // }}}
@@ -71,9 +76,9 @@ impl Cli {
     }
     // }}}
 
-    pub fn print_help() {
+    pub fn print_help(mssg: &str) {
         // {{{
-        unimplemented!()
+        eprintln!("{mssg}\n");
     }
     // }}}
 }
@@ -119,17 +124,15 @@ fn parse_list_operations(cli: &mut Cli, args: &mut Args) {
         let arg = get_next_arg(args);
 
         if arg.is_empty() {
-            eprintln!("Please provide the name of the list you wish to operate on\n");
-            Cli::print_help();
+            Cli::print_help("Please provide the name of the list you wish to operate on");
         }
         cli.list_name = arg;
     }
 
     if cli.remove {
         let arg = get_next_arg(args);
-
         if arg == "y" {
-            cli.no_confirmation = true
+            cli.confirmed = true
         }
     }
 }
@@ -147,8 +150,7 @@ fn parse_item_operations(cli: &mut Cli, args: &mut Args) {
         let item = get_next_arg(args);
 
         if item.is_empty() {
-            eprintln!("Please provide the id of the item\n");
-            Cli::print_help();
+            Cli::print_help("Please provide the item");
         }
         cli.item = item;
         cli.add = true;
@@ -156,8 +158,7 @@ fn parse_item_operations(cli: &mut Cli, args: &mut Args) {
         let item_id = get_item_id(args);
 
         if item_id == 0 {
-            eprintln!("Please provide a valid item id\n");
-            Cli::print_help();
+            Cli::print_help("Please provide a valid item id");
         }
         cli.item_id = item_id;
         cli.delete = true;
@@ -166,17 +167,29 @@ fn parse_item_operations(cli: &mut Cli, args: &mut Args) {
         let content = get_next_arg(args);
 
         if item_id == 0 {
-            eprintln!("Please provide a valid item id\n");
-            Cli::print_help();
+            Cli::print_help("Please provide a valid item id");
         }
         if content.is_empty() {
-            eprintln!("Please provide the content you wish to append to the item\n");
-            Cli::print_help();
+            Cli::print_help("Please provide the content you wish to append to the item");
         }
-
         cli.item_id = item_id;
         cli.item = content;
         cli.append = true;
+    }
+
+    let path = crate::get_path(&cli.list_name);
+    check_id(&path, cli.item_id);
+}
+// }}}
+
+fn check_id(path: &str, id: u8) {
+    // {{{
+    let file = File::open(path).expect("Unable to open list for reading");
+    let line_count = BufReader::new(&file).lines().count();
+
+    if usize::from(id) > line_count {
+        eprintln!("The id is above the last id");
+        process::exit(1);
     }
 }
 // }}}

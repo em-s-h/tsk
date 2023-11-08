@@ -11,17 +11,15 @@ const LISTS_DIR: &str = "./lists/"; // For debugging
 
 pub fn run(cli: Cli) {
     // {{{
-
     let path = get_path(&cli.list_name);
 
     if cli.create {
         lists::create_list(&path);
         println!("List created");
     } else if cli.remove {
-        lists::remove_list(&path, &cli.list_name, cli.no_confirmation);
+        lists::remove_list(&path, &cli.list_name, cli.confirmed);
         println!("List removed");
-        // process::exit(0);
-        panic!("Replace with exit 0");
+        process::exit(0);
     }
 
     if cli.add {
@@ -45,8 +43,7 @@ fn check_list(path: &str) {
     // {{{
     if !list_exists(&path) {
         eprintln!("This list doesn't exist!");
-        // process::exit(1);
-        panic!("Replace with exit 1");
+        process::exit(1);
     }
 }
 // }}}

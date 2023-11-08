@@ -47,16 +47,14 @@ pub fn remove_list(path: &str, name: &str, confirmed: bool) {
 
         if input.to_lowercase().starts_with("n") {
             println!("Aborting...");
-            // process::exit(0);
-            panic!("Replace with exit 0");
+            process::exit(0);
         }
     }
 
     if let Err(e) = fs::remove_file(path) {
         eprintln!("Unable to delete {name}.");
         eprintln!("Error: {e}");
-        // process::exit(1);
-        panic!("Replace with exit 1");
+        process::exit(1);
     }
 }
 // }}}

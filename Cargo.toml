@@ -1,5 +1,5 @@
 [package]
 name = "clist"
-version = "0.6.3"
+version = "0.8.5"
 edition = "2021"
 authors = [ "Emilly S.H./M.S." ]
