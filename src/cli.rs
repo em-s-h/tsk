@@ -28,6 +28,9 @@ pub struct Cli {
     /// Append to an item of the list
     pub append: bool,
 
+    /// Rewrite an item of the list
+    pub edit: bool,
+
     /// Delete an item from the list
     pub delete: bool,
 
@@ -51,6 +54,7 @@ impl Cli {
             remove: false,
             add: false,
             append: false,
+            edit: false,
             delete: false,
             show_lists: true,
             confirmed: false,
@@ -81,25 +85,6 @@ impl Cli {
         eprintln!("{mssg}\n");
     }
     // }}}
-}
-// }}}
-
-fn get_next_arg(args: &mut Args) -> String {
-    // {{{
-    match args.next() {
-        Some(a) => a,
-        None => String::new(),
-    }
-}
-// }}}
-
-fn get_item_id(args: &mut Args) -> u8 {
-    // {{{
-    if let Ok(id) = get_next_arg(args).parse() {
-        id
-    } else {
-        0
-    }
 }
 // }}}
 
@@ -135,6 +120,11 @@ fn parse_list_operations(cli: &mut Cli, args: &mut Args) {
             cli.confirmed = true
         }
     }
+
+    if !cli.create {
+        let path = crate::get_path(&cli.list_name);
+        crate::check_list(&path);
+    }
 }
 // }}}
 
@@ -146,42 +136,67 @@ fn parse_item_operations(cli: &mut Cli, args: &mut Args) {
         return;
     }
 
-    if arg == "add" {
-        let item = get_next_arg(args);
+    if arg == "append" || arg == "edit" || arg == "delete" || arg == "move" {
+        cli.item_id = get_item_id(args);
 
-        if item.is_empty() {
-            Cli::print_help("Please provide the item");
-        }
-        cli.item = item;
-        cli.add = true;
-    } else if arg == "delete" {
-        let item_id = get_item_id(args);
+        let path = crate::get_path(&cli.list_name);
+        check_id(&path, cli.item_id);
 
-        if item_id == 0 {
-            Cli::print_help("Please provide a valid item id");
-        }
-        cli.item_id = item_id;
-        cli.delete = true;
-    } else if arg == "append" {
-        let item_id = get_item_id(args);
-        let content = get_next_arg(args);
-
-        if item_id == 0 {
-            Cli::print_help("Please provide a valid item id");
-        }
-        if content.is_empty() {
-            Cli::print_help("Please provide the content you wish to append to the item");
-        }
-        cli.item_id = item_id;
-        cli.item = content;
-        cli.append = true;
+        // -1 because lines are counted from 0
+        cli.item_id = cli.item_id - 1;
     }
 
-    let path = crate::get_path(&cli.list_name);
-    check_id(&path, cli.item_id);
+    if arg == "add" {
+        cli.item = get_item_content(args, "Please provide the item's content");
+        cli.add = true;
+    } else if arg == "append" {
+        cli.item = get_item_content(args, "Please provide the content to append to the item");
+        cli.append = true;
+    } else if arg == "edit" {
+        cli.item = get_item_content(args, "Please provide the new content of the item");
+        cli.edit = true;
+    } else if arg == "delete" {
+        cli.delete = true;
+    }
 }
 // }}}
 
+fn get_next_arg(args: &mut Args) -> String {
+    // {{{
+    match args.next() {
+        Some(a) => a,
+        _ => String::new(),
+    }
+}
+// }}}
+
+fn get_item_id(args: &mut Args) -> u8 {
+    // {{{
+    let item_id = match get_next_arg(args).parse() {
+        Ok(id) => id,
+        _ => 0,
+    };
+
+    if item_id == 0 {
+        Cli::print_help("Please provide a valid item id");
+    }
+
+    item_id - 1
+}
+// }}}
+
+fn get_item_content(args: &mut Args, err_msg: &str) -> String {
+    // {{{
+    let item = get_next_arg(args);
+
+    if item.is_empty() {
+        Cli::print_help(err_msg);
+    }
+    item
+}
+// }}}
+
+/// Makes sure the id is not above the amount of lines
 fn check_id(path: &str, id: u8) {
     // {{{
     let file = File::open(path).expect("Unable to open list for reading");

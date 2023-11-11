@@ -4,11 +4,9 @@ use std::{
     process,
 };
 
-use crate::LISTS_DIR;
-
 pub fn show_lists() {
     // {{{
-    let dir = LISTS_DIR;
+    let dir = crate::get_lists_dir();
 
     let entries = fs::read_dir(dir).expect("Unable to read the contents of the lists directory");
     for entry in entries {
@@ -32,8 +30,6 @@ pub fn create_list(path: &str) {
 
 pub fn remove_list(path: &str, name: &str, confirmed: bool) {
     // {{{
-    crate::check_list(&path);
-
     if !confirmed {
         println!("Are you sure you want to delete {name}?");
         print!("(y/n): ");
@@ -61,7 +57,6 @@ pub fn remove_list(path: &str, name: &str, confirmed: bool) {
 
 pub fn print_list(path: &str, name: &str) {
     // {{{
-    crate::check_list(&path);
     println!("List: [ {name} ]\n");
 
     let file = File::open(path).expect("Unable to open file for reading");
@@ -80,6 +75,12 @@ mod test {
     use std::path::Path;
 
     #[test]
+    #[ignore = "Use only with '--show-output'"]
+    fn show_lists_ok() {
+        show_lists();
+    }
+
+    #[test]
     fn create_list_ok() {
         // {{{
         let path = crate::get_path("test");
@@ -94,9 +95,9 @@ mod test {
     #[test]
     fn remove_list_ok() {
         // {{{
-        let path = crate::get_path("t1");
+        let path = crate::get_path("test2");
         create_list(&path);
-        remove_list(&path, "t1", true);
+        remove_list(&path, "test2", true);
         let exists = Path::new(&path).try_exists().unwrap();
 
         assert!(!exists);
@@ -107,12 +108,6 @@ mod test {
     #[ignore = "Use only with '--show-output'"]
     fn print_list_ok() {
         print_list(&crate::get_path("t2"), "t2");
-    }
-
-    #[test]
-    #[ignore = "Use only with '--show-output'"]
-    fn show_lists_ok() {
-        show_lists();
     }
 }
 // }}}

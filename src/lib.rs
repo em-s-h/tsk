@@ -1,13 +1,12 @@
 use crate::cli::Cli;
-use std::{path::Path, process};
+use std::{env, path::Path, process};
 
 /// Handles the data of the program
 pub mod cli;
 mod items;
 mod lists;
 
-// const LISTS_DIR: &str = "~/.local/share/lists/";
-const LISTS_DIR: &str = "./lists/"; // For debugging
+const LISTS_DIR: &str = "/.local/share/lists/";
 
 pub fn run(cli: Cli) {
     // {{{
@@ -25,6 +24,12 @@ pub fn run(cli: Cli) {
     if cli.add {
         items::add_item(&path, &cli.item);
         println!("Item added");
+    } else if cli.append {
+        items::append_to_item(&path, cli.item_id, &cli.item);
+        println!("Content appended");
+    } else if cli.edit {
+        items::edit_item(&path, cli.item_id, &cli.item);
+        println!("Item edited");
     } else if cli.delete {
         items::delete_item(&path, cli.item_id);
         println!("Item deleted");
@@ -60,12 +65,23 @@ fn list_exists(path: &str) -> bool {
 }
 // }}}
 
-fn get_path(list: &str) -> String {
-    format!("{}{}", LISTS_DIR, list)
-}
-
-#[cfg(test)]
-mod test {
+fn get_lists_dir() -> String {
     // {{{
+    if let Some(h) = env::home_dir() {
+        let h = h.to_str().unwrap();
+        let h = h.to_string();
+        h + LISTS_DIR
+    } else {
+        eprintln!("Unable to obtain home directory");
+        process::exit(1);
+    }
+}
+// }}}
+
+fn get_path(list: &str) -> String {
+    // {{{
+    let list_dir = get_lists_dir();
+
+    format!("{list_dir}{list}")
 }
 // }}}
