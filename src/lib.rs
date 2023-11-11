@@ -30,6 +30,9 @@ pub fn run(cli: Cli) {
     } else if cli.edit {
         items::edit_item(&path, cli.item_id, &cli.item);
         println!("Item edited");
+    } else if cli.move_item {
+        items::move_item(&path, cli.item_id, cli.new_id);
+        println!("Item moved");
     } else if cli.delete {
         items::delete_item(&path, cli.item_id);
         println!("Item deleted");
@@ -39,28 +42,6 @@ pub fn run(cli: Cli) {
         lists::show_lists();
     } else {
         lists::print_list(&path, &cli.list_name);
-    }
-}
-// }}}
-
-/// Check if the list exists and warn the user
-fn check_list(path: &str) {
-    // {{{
-    if !list_exists(&path) {
-        eprintln!("This list doesn't exist!");
-        process::exit(1);
-    }
-}
-// }}}
-
-fn list_exists(path: &str) -> bool {
-    // {{{
-    let path = Path::new(path);
-    if let Ok(exists) = path.try_exists() {
-        exists
-    } else {
-        eprintln!("Unable to verify the existence of file");
-        false
     }
 }
 // }}}
@@ -83,5 +64,17 @@ fn get_path(list: &str) -> String {
     let list_dir = get_lists_dir();
 
     format!("{list_dir}{list}")
+}
+// }}}
+
+fn list_exists(path: &str) -> bool {
+    // {{{
+    let path = Path::new(path);
+    if let Ok(exists) = path.try_exists() {
+        exists
+    } else {
+        eprintln!("Unable to verify the existence of file");
+        false
+    }
 }
 // }}}
