@@ -6,6 +6,7 @@ use std::{
     process,
 };
 
+#[derive(Debug)]
 pub struct Cli {
     // {{{
     /// Name of the list to operate on
@@ -105,8 +106,6 @@ impl Cli {
         }
 
         // Parse list related arguments {{{
-        arg = get_next_arg(&mut args);
-
         if arg == "create" || arg == "c" {
             self.create = true;
         } else if arg == "print" || arg == "p" {
@@ -129,6 +128,25 @@ impl Cli {
             self.list_name = arg;
         }
 
+        // Check if the list exists {{{
+        if !self.create {
+            let path = crate::get_path(&self.list_name);
+
+            let list_exists = {
+                let path = Path::new(&path);
+                match path.try_exists() {
+                    Ok(result) => result,
+                    _ => false,
+                }
+            };
+
+            if !list_exists {
+                eprintln!("This list doesn't exist!");
+                process::exit(1);
+            }
+        }
+        // }}}
+
         if self.rename {
             let arg = get_next_arg(&mut args);
 
@@ -150,25 +168,6 @@ impl Cli {
             }
             return self;
         }
-
-        // Check if the list exists {{{
-        if !self.create {
-            let path = crate::get_path(&self.list_name);
-
-            let list_exists = {
-                let path = Path::new(&path);
-                match path.try_exists() {
-                    Ok(result) => result,
-                    _ => false,
-                }
-            };
-
-            if !list_exists {
-                eprintln!("This list doesn't exist!");
-                process::exit(1);
-            }
-        }
-        // }}}
         // }}}
 
         // Parse item related arguments {{{
