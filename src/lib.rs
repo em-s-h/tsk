@@ -1,5 +1,5 @@
 use crate::cli::Cli;
-use std::{env, process};
+use std::{env, fs, process};
 
 /// Handles the data of the program
 pub mod cli;
@@ -27,7 +27,9 @@ pub fn run(cli: Cli) {
         lists::print_list(&path, &cli.list_name);
         process::exit(0);
     } else if cli.rename {
-        lists::rename_list(&path, &cli.old_list_name, &cli.list_name);
+        let name = crate::get_path(&cli.old_list_name);
+        let new_name = crate::get_path(&cli.list_name);
+        fs::rename(name, new_name).expect("Unable to rename lists");
         println!("List renamed");
     } else if cli.remove {
         lists::remove_list(&path, &cli.list_name, cli.confirmed);

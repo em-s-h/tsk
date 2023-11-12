@@ -50,11 +50,6 @@ pub fn print_list(path: &str, name: &str) {
 }
 // }}}
 
-pub fn rename_list(path: &str, name: &str, new_name: &str) {
-    // {{{
-}
-// }}}
-
 pub fn remove_list(path: &str, name: &str, confirmed: bool) {
     // {{{
     if !confirmed {
