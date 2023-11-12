@@ -1,6 +1,7 @@
 use std::{
     fs::{self, File},
     io::{self, BufRead, BufReader, Write},
+    path::Path,
     process,
 };
 
@@ -19,12 +20,38 @@ pub fn show_lists() {
 
 pub fn create_list(path: &str) {
     // {{{
-    if crate::list_exists(&path) {
+    let list_exists = {
+        let path = Path::new(path);
+        match path.try_exists() {
+            Ok(result) => result,
+            _ => false,
+        }
+    };
+
+    if list_exists {
         println!("This list already exists!");
         return;
     }
 
     File::create(path).expect("Unable to create file");
+}
+// }}}
+
+pub fn print_list(path: &str, name: &str) {
+    // {{{
+    println!("List: [ {name} ]\n");
+
+    let file = File::open(path).expect("Unable to open file for reading");
+    let reader = BufReader::new(file);
+
+    for (id, l) in reader.lines().map(|l| l.unwrap()).enumerate() {
+        println!("{}. {l}", id + 1);
+    }
+}
+// }}}
+
+pub fn rename_list(path: &str, name: &str, new_name: &str) {
+    // {{{
 }
 // }}}
 
@@ -51,19 +78,6 @@ pub fn remove_list(path: &str, name: &str, confirmed: bool) {
         eprintln!("Unable to delete {name}.");
         eprintln!("Error: {e}");
         process::exit(1);
-    }
-}
-// }}}
-
-pub fn print_list(path: &str, name: &str) {
-    // {{{
-    println!("List: [ {name} ]\n");
-
-    let file = File::open(path).expect("Unable to open file for reading");
-    let reader = BufReader::new(file);
-
-    for (id, l) in reader.lines().map(|l| l.unwrap()).enumerate() {
-        println!("{}. {l}", id + 1);
     }
 }
 // }}}

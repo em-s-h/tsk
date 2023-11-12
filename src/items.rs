@@ -60,12 +60,25 @@ pub fn edit_item(path: &str, id: u8, new_content: &str) {
 
 pub fn move_item(path: &str, from: u8, to: u8) {
     // {{{
-    let item = if let Some(itm) = get_item_to_move(path, from) {
-        itm
-    } else {
-        eprintln!("Unable to find itme to move");
-        process::exit(1);
+    let item = {
+        // Get item to be moved {{{
+        let f = File::open(path).expect("Unable to open file for reading");
+        let reader = BufReader::new(f);
+        let mut item = String::new();
+
+        for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
+            if i == from.into() {
+                item = ln;
+            }
+        }
+        if item.is_empty() {
+            eprintln!("Unable to find the item to move");
+            process::exit(1);
+        }
+        item
     };
+    // }}}
+
     let out_path = path.to_string() + ".tmp";
 
     // Scope ensures files are closed
@@ -114,20 +127,6 @@ fn prep_files(read_file: &str, out_file: &str) -> (BufReader<File>, BufWriter<Fi
     let writer = BufWriter::new(out_file);
 
     (reader, writer)
-}
-// }}}
-
-fn get_item_to_move(path: &str, id: u8) -> Option<String> {
-    // {{{
-    let f = File::open(path).expect("Unable to open file for reading");
-    let reader = BufReader::new(f);
-
-    for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-        if i == id.into() {
-            return Some(ln);
-        }
-    }
-    None
 }
 // }}}
 
