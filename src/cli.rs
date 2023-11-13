@@ -12,10 +12,10 @@ pub struct Cli {
     pub task: String,
 
     /// Id (line number) of the task
-    pub task_id: u8,
+    pub task_id: usize,
 
     /// Used when moving tasks
-    pub new_id: u8,
+    pub new_id: usize,
 
     pub print_help: bool,
 
@@ -64,36 +64,68 @@ impl Cli {
 
     pub fn parse_args(mut self) -> Self {
         // {{{
+        fn get_next_arg(args: &mut Args) -> String {
+            // {{{
+            match args.next() {
+                Some(a) => a,
+                _ => String::new(),
+            }
+        }
+        // }}}
+
         let mut args = env::args();
         args.next(); // First argument is unneeded
 
-        let mut arg = get_next_arg(&mut args);
+        let arg = get_next_arg(&mut args);
         if arg == "--help" || arg == "-h" {
             self.print_help = true;
             return self;
-        } else if arg == "--no-color" {
-            self.colored_output = false;
         } else if arg == "print" || arg == "p" {
             self.print = true;
             return self;
+        } else if arg == "--no-color" {
+            self.colored_output = false;
         }
 
         // Parse task related arguments {{{
         /// Makes sure the id is not above the amount of lines in a list
-        fn check_id(id: u8) {
+        fn check_id(id: usize) {
             // {{{
             let path = crate::get_list();
             let file = File::open(&path).expect("Unable to open list for reading");
             let line_count = BufReader::new(&file).lines().count();
 
-            if usize::from(id) > line_count {
+            if id > line_count {
                 eprintln!("The id is above the last id");
                 process::exit(1);
             }
         }
         // }}}
 
-        arg = get_next_arg(&mut args);
+        fn get_task_id(args: &mut Args) -> usize {
+            // {{{
+            match get_next_arg(args).parse() {
+                Ok(id) => id,
+                _ => {
+                    eprintln!("Please provide a valid task id");
+                    process::exit(1);
+                }
+            }
+        }
+        // }}}
+
+        fn get_task_content(args: &mut Args) -> String {
+            // {{{
+            let task = get_next_arg(args);
+
+            if task.is_empty() {
+                eprintln!("Please provide the task's content");
+                process::exit(1);
+            }
+            task
+        }
+        // }}}
+
         if arg.is_empty() {
             return self;
         }
@@ -173,42 +205,5 @@ Commands:
         );
     }
     // }}}
-}
-// }}}
-
-fn get_next_arg(args: &mut Args) -> String {
-    // {{{
-    match args.next() {
-        Some(a) => a,
-        _ => String::new(),
-    }
-}
-// }}}
-
-fn get_task_id(args: &mut Args) -> u8 {
-    // {{{
-    let task_id = match get_next_arg(args).parse() {
-        Ok(id) => id,
-        _ => 0,
-    };
-
-    if task_id == 0 {
-        eprintln!("Please provide a valid task id");
-        process::exit(1);
-    }
-
-    task_id - 1
-}
-// }}}
-
-fn get_task_content(args: &mut Args) -> String {
-    // {{{
-    let task = get_next_arg(args);
-
-    if task.is_empty() {
-        eprintln!("Please provide the task's content");
-        process::exit(1);
-    }
-    task
 }
 // }}}

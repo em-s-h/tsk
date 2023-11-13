@@ -1,5 +1,5 @@
 [package]
 name = "tsk"
-version = "0.10.7"
+version = "0.11.8"
 edition = "2021"
 authors = [ "Emilly S.H./M.S." ]
