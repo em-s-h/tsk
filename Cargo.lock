@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "clist"
+name = "clask"
 version = "0.10.7"
