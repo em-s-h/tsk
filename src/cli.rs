@@ -24,6 +24,15 @@ pub struct Cli {
     /// Print the contents of the list
     pub print: bool,
 
+    /// Mark a task as done
+    pub mark_done: bool,
+
+    /// Unmark a task as done
+    pub unmark_done: bool,
+
+    /// Remove all tasks that are marked as done
+    pub clear_dones: bool,
+
     /// Add an task to the list
     pub add: bool,
 
@@ -53,6 +62,9 @@ impl Cli {
             colored_output: true,
 
             print: false,
+            mark_done: false,
+            unmark_done: false,
+            clear_dones: false,
             add: false,
             append: false,
             edit: false,
@@ -80,14 +92,16 @@ impl Cli {
         if arg == "--help" || arg == "-h" {
             self.print_help = true;
             return self;
-        } else if arg == "print" || arg == "p" {
-            self.print = true;
-            return self;
         } else if arg == "--no-color" {
             self.colored_output = false;
         }
 
-        // Parse task related arguments {{{
+        if arg == "print" || arg == "p" {
+            self.print = true;
+            return self;
+        }
+
+        // Parse task operation related arguments {{{
         /// Makes sure the id is not above the amount of lines in a list
         fn check_id(id: usize) {
             // {{{
@@ -130,7 +144,13 @@ impl Cli {
             return self;
         }
 
-        if arg == "add" || arg == "a" {
+        if arg == "do" {
+            self.mark_done = true;
+        } else if arg == "undo" || arg == "u" {
+            self.unmark_done = true;
+        } else if arg == "clear" || arg == "c" {
+            self.clear_dones = true;
+        } else if arg == "add" || arg == "a" {
             self.add = true;
         } else if arg == "append" || arg == "ap" {
             self.append = true;
@@ -142,7 +162,16 @@ impl Cli {
             self.delete = true;
         }
 
-        if self.append || self.edit || self.move_task || self.delete {
+        let requires_id = self.mark_done // {{{
+            || self.unmark_done
+            || self.clear_dones
+            || self.append
+            || self.edit
+            || self.move_task
+            || self.delete;
+        // }}}
+
+        if requires_id {
             self.task_id = get_task_id(&mut args);
 
             check_id(self.task_id);
@@ -188,20 +217,25 @@ Options:
         Don't make the output colored
 
 Commands:
-    print p 
+    print   p 
         Print all tasks
         Default when not passing any args
-    add a <task>
-        Add an task to the list
-    append ap <task_id> <content>
+    do          <task_id>
+        Mark a task as done
+    undo    u   <task_id>
+        Unmark a task as done
+    clear   c
+        Remove all tasks that are marked as done
+    add     a   <task>
+        Add a new task
+    append  ap  <task_id> <content>
         Append content to an existing task
-    edit e <task_id> <new_task>
+    edit    e   <task_id> <new_task>
         Replace the contents of an task
-    move m <task_id> <new_task_id>
-        Move an task to a new location
-    delete d <task_id>
-        Delete an task from the list
-        "
+    move    m   <task_id> <new_task_id>
+        Move a task to a new location
+    delete  d   <task_id>
+        Delete a task"
         );
     }
     // }}}

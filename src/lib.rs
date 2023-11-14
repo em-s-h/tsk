@@ -23,11 +23,48 @@ pub fn run(cli: Cli) {
         process::exit(0);
     }
 
-    if cli.add {
+    if cli.mark_done {
+        // Mark task as done operation {{{
+        let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
+            if cli.task_id == id {
+                writeln!(writer, "{ln} [X]").expect("Unable to write to tmp file");
+            } else {
+                writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+            }
+        };
+        operate_list(&list, operation);
+        // }}}
+
+        println!("Task done");
+    } else if cli.unmark_done {
+        // Unmark task as done operation {{{
+        let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
+            let ln = if cli.task_id == id {
+                ln.replace("[X]", "")
+            } else {
+                ln
+            };
+            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+        };
+        operate_list(&list, operation);
+        // }}}
+
+        println!("Task undone");
+    } else if cli.clear_dones {
+        // Remove all tasks marked as done operation {{{
+        let operation = |writer: &mut BufWriter<File>, _id: usize, ln: String| {
+            if !ln.contains("[X]") {
+                writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+            }
+        };
+        operate_list(&list, operation);
+        // }}}
+
+        println!("Done tasks cleared");
+    } else if cli.add {
         add_task(&list, &cli.task);
         println!("Task added");
     } else if cli.append {
-        // append_to_task(&list, cli.task_id, &cli.task);
         // Append to a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if cli.task_id == id {
@@ -36,12 +73,11 @@ pub fn run(cli: Cli) {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
+        operate_list(&list, operation);
         // }}}
 
-        operate_list(&list, operation);
         println!("Content appended");
     } else if cli.edit {
-        // edit_task(&list, cli.task_id, &cli.task);
         // Edit a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if cli.task_id == id {
@@ -50,12 +86,11 @@ pub fn run(cli: Cli) {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
+        operate_list(&list, operation);
         // }}}
 
-        operate_list(&list, operation);
         println!("Task edited");
     } else if cli.move_task {
-        // move_task(&list, cli.task_id, cli.new_id);
         // Move a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if cli.task_id != id {
@@ -83,21 +118,20 @@ pub fn run(cli: Cli) {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
+        operate_list(&list, operation);
         // }}}
 
-        operate_list(&list, operation);
         println!("Task moved");
     } else if cli.delete {
-        // delete_task(&list, cli.task_id);
         // Delete a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if cli.task_id != id {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
+        operate_list(&list, operation);
         // }}}
 
-        operate_list(&list, operation);
         println!("Task deleted");
     }
 
@@ -183,177 +217,4 @@ fn get_list() -> String {
         process::exit(1);
     }
 }
-// }}}
-
-// Old funcs {{{
-// fn mark_done(list: &str, id: u8) {
-//     // {{{
-//     let out_list = list.to_string() + ".tmp";
-//
-//     // Scope ensures files are closed
-//     {
-//         let (reader, mut writer) = prep_files(list, &out_list);
-//
-//         for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-//             if i == id.into() {
-//                 writeln!(writer, "[X] {ln}").expect("Unable to write to tmp file");
-//             } else {
-//                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-//             }
-//         }
-//     }
-//     fs::rename(out_list, list).expect("Unable to rename tmp file");
-// }
-// // }}}
-
-// fn unmark_done(list: &str, id: u8) {
-//     // {{{
-//     let out_list = list.to_string() + ".tmp";
-//
-//     // Scope ensures files are closed
-//     {
-//         let (reader, mut writer) = prep_files(list, &out_list);
-//
-//         for (i, mut ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-//             if i == id.into() {
-//                 ln = ln.replace("[X]", "");
-//             }
-//             writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-//         }
-//     }
-//     fs::rename(out_list, list).expect("Unable to rename tmp file");
-// }
-// // }}}
-
-// fn clear_done(list: &str) {
-//     // {{{
-//     let out_list = list.to_string() + ".tmp";
-//
-//     // Scope ensures files are closed
-//     {
-//         let (reader, mut writer) = prep_files(list, &out_list);
-//
-//         for ln in reader.lines().map(|l| l.unwrap()) {
-//             if ln.contains("[X]") {
-//                 continue;
-//             } else {
-//                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-//             }
-//         }
-//     }
-//     fs::rename(out_list, list).expect("Unable to rename tmp file");
-// }
-// // }}}
-
-// fn append_to_task(list: &str, id: u8, content: &str) {
-//     // {{{
-//     let out_list = list.to_string() + ".tmp";
-//
-//     // Scope ensures files are closed
-//     {
-//         let (reader, mut writer) = prep_files(list, &out_list);
-//
-//         for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-//             if i == id.into() {
-//                 writeln!(writer, "{ln}{content}").expect("Unable to write to tmp file");
-//             } else {
-//                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-//             }
-//         }
-//     }
-//     fs::rename(out_list, list).expect("Unable to rename tmp file");
-// }
-// // }}}
-
-// fn edit_task(list: &str, id: u8, new_content: &str) {
-//     // {{{
-//     let out_list = list.to_string() + ".tmp";
-//
-//     // Scope ensures files are closed
-//     {
-//         let (reader, mut writer) = prep_files(list, &out_list);
-//
-//         for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-//             if i == id.into() {
-//                 writeln!(writer, "{new_content}").expect("Unable to write to tmp file");
-//             } else {
-//                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-//             }
-//         }
-//     }
-//     fs::rename(out_list, list).expect("Unable to rename tmp file");
-// }
-// // }}}
-
-// fn move_task(list: &str, from: u8, to: u8) {
-//     // {{{
-//     let task = {
-//         // Get task to be moved {{{
-//         let f = File::open(list).expect("Unable to open file for reading");
-//         let reader = BufReader::new(f);
-//         let mut task = String::new();
-//
-//         for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-//             if i == from.into() {
-//                 task = ln;
-//             }
-//         }
-//         if task.is_empty() {
-//             eprintln!("Unable to find the task to move");
-//             process::exit(1);
-//         }
-//         task
-//     };
-//     // }}}
-//
-//     let out_list = list.to_string() + ".tmp";
-//
-//     // Scope ensures files are closed
-//     {
-//         let (reader, mut writer) = prep_files(list, &out_list);
-//
-//         for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-//             if i == from.into() {
-//                 continue;
-//             } else if i == to.into() {
-//                 writeln!(writer, "{task}").expect("Unable to write to tmp file");
-//                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-//             } else {
-//                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-//             }
-//         }
-//     }
-//     fs::rename(out_list, list).expect("Unable to rename tmp file");
-// }
-// // }}}
-
-// fn delete_task(list: &str, id: u8) {
-//     // {{{
-//     let out_list = list.to_string() + ".tmp";
-//
-//     // Scope ensures files are closed
-//     {
-//         let (reader, mut writer) = prep_files(list, &out_list);
-//
-//         for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-//             if i != id.into() {
-//                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-//             }
-//         }
-//     }
-//     fs::rename(out_list, list).expect("Unable to rename tmp file");
-// }
-// // }}}
-
-// fn prep_files(read_file: &str, out_file: &str) -> (BufReader<File>, BufWriter<File>) {
-//     // {{{
-//     let file = File::open(read_file).expect("Unable to open list for reading");
-//     let out_file = File::create(out_file).expect("Unable to create output file");
-//
-//     let reader = BufReader::new(file);
-//     let writer = BufWriter::new(out_file);
-//
-//     (reader, writer)
-// }
-// // }}}
 // }}}
