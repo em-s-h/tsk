@@ -164,7 +164,6 @@ impl Cli {
 
         let requires_id = self.mark_done // {{{
             || self.unmark_done
-            || self.clear_dones
             || self.append
             || self.edit
             || self.move_task

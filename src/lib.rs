@@ -23,7 +23,10 @@ pub fn run(cli: Cli) {
         process::exit(0);
     }
 
-    if cli.mark_done {
+    if cli.add {
+        add_task(&list, &cli.task);
+        println!("Task added");
+    } else if cli.mark_done {
         // Mark task as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if cli.task_id == id {
@@ -61,9 +64,7 @@ pub fn run(cli: Cli) {
         // }}}
 
         println!("Done tasks cleared");
-    } else if cli.add {
-        add_task(&list, &cli.task);
-        println!("Task added");
+        process::exit(0);
     } else if cli.append {
         // Append to a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
@@ -93,17 +94,16 @@ pub fn run(cli: Cli) {
     } else if cli.move_task {
         // Move a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if cli.task_id != id {
-                writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-            } else if cli.new_id == id {
+            if cli.new_id == id {
+                let movin_up = cli.task_id > cli.new_id;
                 let task = {
                     // Get task to be moved {{{
-                    let f = File::open(&list).expect("Unable to open file for reading");
+                    let f = File::open(get_list()).expect("Unable to open file for reading");
                     let reader = BufReader::new(f);
                     let mut task = String::new();
 
                     for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-                        if i == cli.task_id.into() {
+                        if i == cli.task_id {
                             task = ln;
                         }
                     }
@@ -114,7 +114,16 @@ pub fn run(cli: Cli) {
                     task
                 };
                 // }}}
+
+                if !movin_up {
+                    writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+                }
                 writeln!(writer, "{task}").expect("Unable to write to tmp file");
+
+                if movin_up {
+                    writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+                }
+            } else if cli.task_id != id {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
@@ -207,8 +216,10 @@ fn add_task(list: &str, task: &str) {
 }
 // }}}
 
+/// Get the task list
 fn get_list() -> String {
     // {{{
+    // Windows support isn't planned
     if let Some(h) = env::home_dir() {
         let h = h.to_str().unwrap();
         format!("{h}{TASK_LIST}")
