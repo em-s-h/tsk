@@ -152,10 +152,6 @@ impl Cli {
         }
         // }}}
 
-        if arg.is_empty() {
-            return self;
-        }
-
         if arg == "do" {
             self.mark_done = true;
         } else if arg == "undo" || arg == "u" {
