@@ -18,6 +18,9 @@ pub fn run(cli: Cli) {
     if cli.print_help {
         Cli::print_help();
         process::exit(0);
+    } else if cli.print_version {
+        Cli::print_version();
+        process::exit(0);
     } else if cli.print {
         print_tasks(&list, cli.colored_output);
         process::exit(0);

@@ -5,6 +5,11 @@ use std::{
     process,
 };
 
+const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+const AUTHOR: &str = env!("CARGO_PKG_AUTHORS");
+const NAME: &str = env!("CARGO_PKG_NAME");
+
 #[derive(Debug)]
 pub struct Cli {
     // {{{
@@ -18,6 +23,8 @@ pub struct Cli {
     pub new_id: usize,
 
     pub print_help: bool,
+
+    pub print_version: bool,
 
     pub colored_output: bool,
 
@@ -58,7 +65,9 @@ impl Cli {
             task: String::new(),
             task_id: 0,
             new_id: 0,
+
             print_help: false,
+            print_version: false,
             colored_output: true,
 
             print: false,
@@ -92,11 +101,14 @@ impl Cli {
         if arg == "--help" || arg == "-h" {
             self.print_help = true;
             return self;
+        } else if arg == "--version" || arg == "-v" {
+            self.print_version = true;
+            return self;
         } else if arg == "--no-color" {
             self.colored_output = false;
         }
 
-        if arg == "print" || arg == "p" {
+        if arg == "print" || arg == "p" || arg.is_empty() {
             self.print = true;
             return self;
         }
@@ -203,15 +215,16 @@ impl Cli {
     pub fn print_help() {
         // {{{
         println!(
-            "Made by: Emilly M.S./S.H.
+            "{NAME}: {DESCRIPTION}
+Made by: {AUTHOR}
 
-tsk: A task manager for the CLI.
-
-Usage: tsk [Options] [Command] [Args]...
+Usage: {NAME} [Options] [Command] [Args]...
 
 Options:
-    --help -h
+    --help      -h
         Print this message
+    --version   -v
+        Print the program version
     --no-color
         Don't make the output colored
 
@@ -236,6 +249,12 @@ Commands:
     delete  d   <task_id>
         Delete a task"
         );
+    }
+    // }}}
+
+    pub fn print_version() {
+        // {{{
+        println!("{NAME}: {DESCRIPTION}\n{VERSION}");
     }
     // }}}
 }

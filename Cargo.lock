@@ -4,4 +4,4 @@ version = 3
 
 [[package]]
 name = "tsk"
-version = "0.12.10"
+version = "0.13.10"
