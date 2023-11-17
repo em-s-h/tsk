@@ -37,7 +37,7 @@ pub struct Cli {
     /// Unmark a task as done
     pub unmark_done: bool,
 
-    /// Remove all tasks that are marked as done
+    /// Delete all tasks that are marked as done
     pub clear_dones: bool,
 
     /// Add an task to the list
@@ -233,7 +233,7 @@ Commands:
     undo    u   <task_id>
         Unmark a task as done
     clear   c
-        Remove all tasks that are marked as done
+        Delete all tasks that are marked as done
     add     a   <task>
         Add a new task
     append  ap  <task_id> <content>
