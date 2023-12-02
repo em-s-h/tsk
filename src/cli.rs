@@ -98,10 +98,10 @@ impl Cli {
         args.next(); // First argument is unneeded
 
         let arg = get_next_arg(&mut args);
-        if arg == "--help" {
+        if arg == "--help" || arg == "-h" {
             self.print_help = true;
             return self;
-        } else if arg == "--version" {
+        } else if arg == "--version" || arg == "-v" {
             self.print_version = true;
             return self;
         } else if arg == "--no-color" {
