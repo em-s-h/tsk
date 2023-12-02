@@ -3,10 +3,20 @@ A simple CLI task manager
 
 ## Installation
 
-To install tsk simply download the latest binary from the [releases](https://github.com/em-s-h/xdelta_lui/releases)
-page, make it executable, and add it to your PATH.
+1. Download the latest binary from the [releases](https://github.com/em-s-h/xdelta_lui/releases)
+page
+2. Make it executable
+3. Add it to a directory in your PATH.
+
+### Bash completions
+
+1. Copy the contents of the file `tsk.sh`
+2. Paste it in your bashrc file or a file that is sourced by bashrc
 
 ## Building from source
 
-To build tsk from source simply clone the repository `git clone git@github.com:em-s-h/tsk.git`, and
-inside the repository run `cargo b -r`;
+1. Clone the repository
+```shell
+git clone git@github.com:em-s-h/tsk.git
+```
+2. Inside the repository run `cargo b -r` for a release build

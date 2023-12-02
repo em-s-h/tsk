@@ -98,17 +98,17 @@ impl Cli {
         args.next(); // First argument is unneeded
 
         let arg = get_next_arg(&mut args);
-        if arg == "--help" || arg == "-h" {
+        if arg == "--help" {
             self.print_help = true;
             return self;
-        } else if arg == "--version" || arg == "-v" {
+        } else if arg == "--version" {
             self.print_version = true;
             return self;
         } else if arg == "--no-color" {
             self.colored_output = false;
         }
 
-        if arg == "print" || arg == "p" || arg.is_empty() {
+        if arg == "print" || arg.is_empty() {
             self.print = true;
             return self;
         }
@@ -154,19 +154,19 @@ impl Cli {
 
         if arg == "do" {
             self.mark_done = true;
-        } else if arg == "undo" || arg == "u" {
+        } else if arg == "undo" {
             self.unmark_done = true;
-        } else if arg == "clear" || arg == "c" {
+        } else if arg == "clear" {
             self.clear_dones = true;
-        } else if arg == "add" || arg == "a" {
+        } else if arg == "add" {
             self.add = true;
-        } else if arg == "append" || arg == "ap" {
+        } else if arg == "append" {
             self.append = true;
-        } else if arg == "edit" || arg == "e" {
+        } else if arg == "edit" {
             self.edit = true
-        } else if arg == "move" || arg == "m" {
+        } else if arg == "move" {
             self.move_task = true;
-        } else if arg == "delete" || arg == "d" {
+        } else if arg == "delete" {
             self.delete = true;
         }
 
@@ -214,7 +214,7 @@ impl Cli {
             "{NAME}: {DESCRIPTION}
 Made by: {AUTHOR}
 
-Usage: {NAME} [Options] [Command] [Args]...
+Usage: {NAME} [Options] [Command] [Args]
 
 Options:
     --help      -h
@@ -225,24 +225,24 @@ Options:
         Don't make the output colored
 
 Commands:
-    print   p 
+    print
         Print all tasks
         Default when not passing any args
-    do          <task_id>
+    do      <task_id>
         Mark a task as done
-    undo    u   <task_id>
+    undo    <task_id>
         Unmark a task as done
-    clear   c
+    clear   
         Delete all tasks that are marked as done
-    add     a   <task>
+    add     <task>
         Add a new task
-    append  ap  <task_id> <content>
+    append  <task_id> <content>
         Append content to an existing task
-    edit    e   <task_id> <new_task>
-        Replace the contents of an task
-    move    m   <task_id> <new_task_id>
+    edit    <task_id> <new_task>
+        Replace the contents of a task
+    move    <task_id> <new_task_id>
         Move a task to a new location
-    delete  d   <task_id>
+    delete  <task_id>
         Delete a task"
         );
     }
