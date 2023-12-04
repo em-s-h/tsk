@@ -6,7 +6,6 @@ use std::{
     process,
 };
 
-/// Handles the data of the program
 pub mod cli;
 
 const TASK_LIST: &str = "/.local/share/tsk/task_list";
@@ -32,15 +31,14 @@ pub fn run(cli: Cli) {
     } else if cli.mark_done {
         // Mark task as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if cli.task_id == id {
+            if cli.task_id == id && !ln.contains("[X]") {
                 writeln!(writer, "{ln} [X]").expect("Unable to write to tmp file");
             } else {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
-        operate_list(&list, operation);
         // }}}
-
+        operate_list(&list, operation);
         println!("Task done");
     } else if cli.unmark_done {
         // Unmark task as done operation {{{
@@ -52,9 +50,8 @@ pub fn run(cli: Cli) {
             };
             writeln!(writer, "{ln}").expect("Unable to write to tmp file");
         };
-        operate_list(&list, operation);
         // }}}
-
+        operate_list(&list, operation);
         println!("Task undone");
     } else if cli.clear_dones {
         // Remove all tasks marked as done operation {{{
@@ -63,11 +60,9 @@ pub fn run(cli: Cli) {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
-        operate_list(&list, operation);
         // }}}
-
+        operate_list(&list, operation);
         println!("Done tasks cleared");
-        process::exit(0);
     } else if cli.append {
         // Append to a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
@@ -77,9 +72,8 @@ pub fn run(cli: Cli) {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
-        operate_list(&list, operation);
         // }}}
-
+        operate_list(&list, operation);
         println!("Content appended");
     } else if cli.edit {
         // Edit a task operation {{{
@@ -90,9 +84,8 @@ pub fn run(cli: Cli) {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
-        operate_list(&list, operation);
         // }}}
-
+        operate_list(&list, operation);
         println!("Task edited");
     } else if cli.move_task {
         // Move a task operation {{{
@@ -118,11 +111,13 @@ pub fn run(cli: Cli) {
                 };
                 // }}}
 
+                // Ex.: 1 -> 3
                 if !movin_up {
                     writeln!(writer, "{ln}").expect("Unable to write to tmp file");
                 }
                 writeln!(writer, "{task}").expect("Unable to write to tmp file");
 
+                // Ex.: 3 -> 1
                 if movin_up {
                     writeln!(writer, "{ln}").expect("Unable to write to tmp file");
                 }
@@ -130,9 +125,8 @@ pub fn run(cli: Cli) {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
-        operate_list(&list, operation);
         // }}}
-
+        operate_list(&list, operation);
         println!("Task moved");
     } else if cli.delete {
         // Delete a task operation {{{
@@ -141,9 +135,8 @@ pub fn run(cli: Cli) {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
-        operate_list(&list, operation);
         // }}}
-
+        operate_list(&list, operation);
         println!("Task deleted");
     }
 
@@ -154,8 +147,8 @@ pub fn run(cli: Cli) {
 fn operate_list<F>(list: &str, operation: F)
 where
     F: Fn(&mut BufWriter<File>, usize, String),
-    // {{{
 {
+    // {{{
     let out_list = list.to_string() + ".tmp";
 
     // Scope ensures files are closed
