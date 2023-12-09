@@ -97,7 +97,7 @@ impl Cli {
         let mut args = env::args();
         args.next(); // First argument is unneeded
 
-        let arg = get_next_arg(&mut args);
+        let mut arg = get_next_arg(&mut args);
         if arg == "--help" || arg == "-h" {
             self.print_help = true;
             return self;
@@ -106,6 +106,7 @@ impl Cli {
             return self;
         } else if arg == "--no-color" {
             self.colored_output = false;
+            arg = get_next_arg(&mut args);
         }
 
         if arg == "print" || arg.is_empty() {
