@@ -111,6 +111,9 @@ impl Cli {
         if arg == "print" || arg.is_empty() {
             self.print = true;
             return self;
+        } else if arg == "clear" {
+            self.clear_dones = true;
+            return self;
         }
 
         // Parse task operation related arguments {{{
@@ -152,22 +155,18 @@ impl Cli {
         }
         // }}}
 
-        if arg == "do" {
-            self.mark_done = true;
-        } else if arg == "undo" {
-            self.unmark_done = true;
-        } else if arg == "clear" {
-            self.clear_dones = true;
-        } else if arg == "add" {
-            self.add = true;
-        } else if arg == "append" {
-            self.append = true;
-        } else if arg == "edit" {
-            self.edit = true
-        } else if arg == "move" {
-            self.move_task = true;
-        } else if arg == "delete" {
-            self.delete = true;
+        match arg.as_str() {
+            "do" => self.mark_done = true,
+            "undo" => self.unmark_done = true,
+            "add" => self.add = true,
+            "append" => self.append = true,
+            "edit" => self.edit = true,
+            "move" => self.move_task = true,
+            "delete" => self.delete = true,
+            _ => {
+                eprintln!("{arg} is not a valid argument");
+                process::exit(1)
+            }
         }
 
         let requires_id = self.mark_done // {{{
