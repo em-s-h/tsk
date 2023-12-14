@@ -39,13 +39,13 @@ pub fn run(cli: Cli) {
         };
         // }}}
 
-        println!("Marking tasks...");
+        println!("Marking tasks as done...");
         operate_list(&list, operation);
     } else if cli.unmark_done {
         // Unmark task as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             let ln = if cli.task_ids.contains(&id) {
-                ln.replace("[X]", "")
+                ln.replace("[X]", "").trim().to_string()
             } else {
                 ln
             };
