@@ -16,8 +16,8 @@ pub struct Cli {
     /// The task that will be added to the list
     pub task: String,
 
-    /// Id (line number) of the task
-    pub task_id: usize,
+    /// Id (line number) of the task or tasks to be operated
+    pub task_ids: Vec<usize>,
 
     /// Used when moving tasks
     pub new_id: usize,
@@ -63,7 +63,7 @@ impl Cli {
         // {{{
         Self {
             task: String::new(),
-            task_id: 0,
+            task_ids: vec![0],
             new_id: 0,
 
             print_help: false,
@@ -119,28 +119,43 @@ impl Cli {
 
         // Parse task operation related arguments {{{
         /// Makes sure the id is not above the amount of lines in a list
-        fn check_id(id: usize) {
+        fn check_ids(ids: Vec<usize>) {
             // {{{
             let path = crate::get_list();
             let file = File::open(&path).expect("Unable to open list for reading");
             let line_count = BufReader::new(&file).lines().count();
 
-            if id > line_count {
-                eprintln!("The id is above the last id");
-                process::exit(1);
+            for id in ids {
+                if id > line_count {
+                    eprintln!("The id:{id} is above the last id");
+                    process::exit(1);
+                }
             }
         }
         // }}}
 
-        fn get_task_id(args: &mut Args) -> usize {
+        fn get_task_ids(args: &mut Args) -> Vec<usize> {
             // {{{
-            match get_next_arg(args).parse() {
-                Ok(id) => id,
-                _ => {
-                    eprintln!("Please provide a valid task id");
-                    process::exit(1);
-                }
-            }
+            // old way
+            // match get_next_arg(args).parse() {
+            //     Ok(id) => id,
+            //     _ => {
+            //         eprintln!("Please provide a valid task id");
+            //         process::exit(1);
+            //     }
+            // }
+            let mut ids: Vec<usize> = get_next_arg(args)
+                .split(',')
+                .map(|id| {
+                    id.trim()
+                        .parse()
+                        .expect("Please make sure all ids are valid")
+                })
+                .collect();
+
+            ids.sort();
+            ids.dedup();
+            ids
         }
         // }}}
 
@@ -179,11 +194,11 @@ impl Cli {
         // }}}
 
         if requires_id {
-            self.task_id = get_task_id(&mut args);
+            self.task_ids = get_task_ids(&mut args);
 
-            check_id(self.task_id);
+            check_ids(self.task_ids);
             // -1 because lines are counted from 0
-            self.task_id -= 1;
+            self.task_ids = self.task_ids.iter().map(|id| id - 1).collect();
         }
 
         if self.add || self.append || self.edit {
@@ -191,13 +206,12 @@ impl Cli {
         }
 
         if self.move_task {
-            self.new_id = get_task_id(&mut args);
+            self.new_id = get_task_ids(&mut args)[0];
 
-            check_id(self.new_id);
-            // -1 because lines are counted from 0
+            check_ids(vec![self.new_id]);
             self.new_id -= 1;
 
-            if self.new_id == self.task_id {
+            if self.new_id == self.task_ids[0] {
                 eprintln!("Please provide different task ids");
                 process::exit(1);
             }
@@ -228,12 +242,12 @@ Commands:
     print
         Print all tasks
         Default when not passing any args
-    do      <task_id>
-        Mark a task as done
-    undo    <task_id>
-        Unmark a task as done
     clear   
         Delete all tasks that are marked as done
+    do      <task_ids>
+        Mark 1 or more tasks as done
+    undo    <task_ids>
+        Unmark 1 or more tasks as done
     add     <task>
         Add a new task
     append  <task_id> <content>
@@ -242,8 +256,8 @@ Commands:
         Replace the contents of a task
     move    <task_id> <new_task_id>
         Move a task to a new location
-    delete  <task_id>
-        Delete a task"
+    delete  <task_ids>
+        Delete 1 or more tasks"
         );
     }
     // }}}

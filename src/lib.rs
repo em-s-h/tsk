@@ -26,24 +26,25 @@ pub fn run(cli: Cli) {
     }
 
     if cli.add {
+        println!("Adding task...");
         add_task(&list, &cli.task);
-        println!("Task added");
     } else if cli.mark_done {
         // Mark task as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if cli.task_id == id && !ln.contains("[X]") {
+            if cli.task_ids.contains(&id) && !ln.contains("[X]") {
                 writeln!(writer, "{ln} [X]").expect("Unable to write to tmp file");
             } else {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
         // }}}
+
+        println!("Marking tasks...");
         operate_list(&list, operation);
-        println!("Task done");
     } else if cli.unmark_done {
         // Unmark task as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            let ln = if cli.task_id == id {
+            let ln = if cli.task_ids.contains(&id) {
                 ln.replace("[X]", "")
             } else {
                 ln
@@ -51,8 +52,9 @@ pub fn run(cli: Cli) {
             writeln!(writer, "{ln}").expect("Unable to write to tmp file");
         };
         // }}}
+
+        println!("Unmarking tasks...");
         operate_list(&list, operation);
-        println!("Task undone");
     } else if cli.clear_dones {
         // Remove all tasks marked as done operation {{{
         let operation = |writer: &mut BufWriter<File>, _id: usize, ln: String| {
@@ -61,37 +63,45 @@ pub fn run(cli: Cli) {
             }
         };
         // }}}
+
+        println!("Clearing tasks...");
         operate_list(&list, operation);
-        println!("Done tasks cleared");
     } else if cli.append {
         // Append to a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if cli.task_id == id {
+            if cli.task_ids[0] == id {
+                let ln = ln
+                    .contains("[X]")
+                    .then(|| ln.replace("[X]", ""))
+                    .unwrap_or(ln);
+
                 writeln!(writer, "{ln}{}", cli.task).expect("Unable to write to tmp file");
             } else {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
         // }}}
+
+        println!("Appending content...");
         operate_list(&list, operation);
-        println!("Content appended");
     } else if cli.edit {
         // Edit a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if cli.task_id == id {
+            if cli.task_ids[0] == id {
                 writeln!(writer, "{}", cli.task).expect("Unable to write to tmp file");
             } else {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
         // }}}
+
+        println!("Editing task...");
         operate_list(&list, operation);
-        println!("Task edited");
     } else if cli.move_task {
         // Move a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if cli.new_id == id {
-                let movin_up = cli.task_id > cli.new_id;
+                let movin_up = cli.task_ids[0] > cli.new_id;
                 let task = {
                     // Get task to be moved {{{
                     let f = File::open(get_list()).expect("Unable to open file for reading");
@@ -99,7 +109,7 @@ pub fn run(cli: Cli) {
                     let mut task = String::new();
 
                     for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
-                        if i == cli.task_id {
+                        if i == cli.task_ids[0] {
                             task = ln;
                         }
                     }
@@ -121,23 +131,25 @@ pub fn run(cli: Cli) {
                 if movin_up {
                     writeln!(writer, "{ln}").expect("Unable to write to tmp file");
                 }
-            } else if cli.task_id != id {
+            } else if cli.task_ids[0] != id {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
         // }}}
+
+        println!("Moving task...");
         operate_list(&list, operation);
-        println!("Task moved");
     } else if cli.delete {
         // Delete a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if cli.task_id != id {
+            if cli.task_ids[0] != id {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
         // }}}
+
+        println!("Deleting task...");
         operate_list(&list, operation);
-        println!("Task deleted");
     }
 
     print_tasks(&list, cli.colored_output);
@@ -188,9 +200,9 @@ fn print_tasks(list: &str, colored: bool) {
         let id = id + 1;
 
         if is_done(&ln) && colored {
-            println!("\x1b[0;32m{id}. {ln} \x1b[0m");
+            println!("{id}. \x1b[0;32m{ln} \x1b[0m");
         } else if colored {
-            println!("\x1b[0;31m{id}. {ln} \x1b[0m");
+            println!("{id}. \x1b[0;31m{ln} \x1b[0m");
         } else {
             println!("{id}. {ln}");
         }
