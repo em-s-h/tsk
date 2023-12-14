@@ -119,14 +119,14 @@ impl Cli {
 
         // Parse task operation related arguments {{{
         /// Makes sure the id is not above the amount of lines in a list
-        fn check_ids(ids: Vec<usize>) {
+        fn check_ids(ids: &[usize]) {
             // {{{
             let path = crate::get_list();
             let file = File::open(&path).expect("Unable to open list for reading");
             let line_count = BufReader::new(&file).lines().count();
 
             for id in ids {
-                if id > line_count {
+                if id.to_owned() > line_count {
                     eprintln!("The id:{id} is above the last id");
                     process::exit(1);
                 }
@@ -196,7 +196,7 @@ impl Cli {
         if requires_id {
             self.task_ids = get_task_ids(&mut args);
 
-            check_ids(self.task_ids);
+            check_ids(&self.task_ids);
             // -1 because lines are counted from 0
             self.task_ids = self.task_ids.iter().map(|id| id - 1).collect();
         }
@@ -208,7 +208,7 @@ impl Cli {
         if self.move_task {
             self.new_id = get_task_ids(&mut args)[0];
 
-            check_ids(vec![self.new_id]);
+            check_ids(&[self.new_id]);
             self.new_id -= 1;
 
             if self.new_id == self.task_ids[0] {
