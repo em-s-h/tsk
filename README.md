@@ -17,7 +17,7 @@ page
 
 1. Clone the repository
 ```shell
-git clone git@github.com:em-s-h/tsk.git
+git clone https://github.com/em-s-h/tsk.git
 ```
 2. Inside the repository run `cargo b -r` for a release build
 

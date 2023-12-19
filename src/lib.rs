@@ -25,6 +25,7 @@ pub fn run(cli: Cli) {
         process::exit(0);
     }
 
+    // Operations {{{
     if cli.add {
         println!("Adding task...");
         add_task(&list, &cli.task);
@@ -151,6 +152,7 @@ pub fn run(cli: Cli) {
         println!("Deleting task...");
         operate_list(&list, operation);
     }
+    // }}}
 
     print_tasks(&list, cli.colored_output);
 }
