@@ -183,6 +183,12 @@ where
 
 fn print_tasks(list: &str, colored: bool) {
     // {{{
+    let meta = fs::metadata(list).expect("Unable to obtain file metadata");
+    if meta.len() == 0 {
+        println!("No tasks to print");
+        process::exit(0);
+    }
+
     println!("Tasks:\n");
 
     let file = File::open(list).expect("Unable to open file for reading");
