@@ -218,7 +218,7 @@ fn add_task(list: &str, task: &str) {
 // }}}
 
 /// Get the task list
-fn get_list() -> String {
+pub fn get_list() -> String {
     // {{{
     // Windows support isn't planned
     if let Some(h) = env::home_dir() {
