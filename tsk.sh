@@ -10,7 +10,7 @@ _tsk_comp() {
         local old_ifs="$IFS"
         IFS=$'\n'
 
-        local items=( $(< ~/.local/share/tsk/task_list)  )
+        local items=( $(< ~/.local/share/tsk/tasks)  )
         local id=$(( ${COMP_WORDS[2]} - 1 ))
 
         if [[ $id -lt 0 ]]; then

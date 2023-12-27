@@ -1,14 +1,13 @@
+use directories::ProjectDirs;
+
 use crate::cli::Cli;
 use std::{
-    env,
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Write},
     process,
 };
 
 pub mod cli;
-
-const TASK_LIST: &str = "/.local/share/tsk/task_list";
 
 pub fn run(cli: Cli) {
     // {{{
@@ -224,15 +223,24 @@ fn add_task(list: &str, task: &str) {
 // }}}
 
 /// Get the task list
-pub fn get_list() -> String {
+fn get_list() -> String {
     // {{{
-    // Windows support isn't planned
-    if let Some(h) = env::home_dir() {
-        let h = h.to_str().unwrap();
-        format!("{h}{TASK_LIST}")
-    } else {
-        eprintln!("Unable to obtain home directory");
-        process::exit(1);
+    let proj =
+        ProjectDirs::from("tsk", "Emilly", "tsk").expect("Unable to create project directory");
+
+    let data_dir = proj.data_local_dir();
+    let dir_entries = data_dir
+        .read_dir()
+        .expect("Unable to read contents of project directory");
+
+    for e in dir_entries {
+        if let Ok(f) = e {
+            if f.file_name() == "tasks" {
+                return format!("{}/tasks", data_dir.to_str().unwrap());
+            }
+        }
     }
+    eprintln!("Unable to obtain 'tasks' file");
+    process::exit(1);
 }
 // }}}

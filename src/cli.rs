@@ -136,14 +136,6 @@ impl Cli {
 
         fn get_task_ids(args: &mut Args) -> Vec<usize> {
             // {{{
-            // old way
-            // match get_next_arg(args).parse() {
-            //     Ok(id) => id,
-            //     _ => {
-            //         eprintln!("Please provide a valid task id");
-            //         process::exit(1);
-            //     }
-            // }
             let mut ids: Vec<usize> = get_next_arg(args)
                 .split(',')
                 .map(|id| {
