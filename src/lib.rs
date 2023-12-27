@@ -30,23 +30,24 @@ pub fn run(cli: Cli) {
         println!("Adding task...");
         add_task(&list, &cli.task);
     } else if cli.mark_done {
-        // Mark task as done operation {{{
+        // Mark tasks as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if cli.task_ids.contains(&id) && !ln.contains("[X]") {
-                writeln!(writer, "{ln} [X]").expect("Unable to write to tmp file");
+            let ln = if cli.task_ids.contains(&id) && !ln.contains("[X]") {
+                ln.replace("[ ]", "[X]")
             } else {
-                writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-            }
+                ln
+            };
+            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
         };
         // }}}
 
         println!("Marking tasks as done...");
         operate_list(&list, operation);
     } else if cli.unmark_done {
-        // Unmark task as done operation {{{
+        // Unmark tasks as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            let ln = if cli.task_ids.contains(&id) {
-                ln.replace("[X]", "").trim().to_string()
+            let ln = if cli.task_ids.contains(&id) && ln.contains("[X]") {
+                ln.replace("[X]", "[ ]")
             } else {
                 ln
             };
@@ -70,16 +71,15 @@ pub fn run(cli: Cli) {
     } else if cli.append {
         // Append to a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if cli.task_ids[0] == id {
-                let ln = ln
-                    .contains("[X]")
-                    .then(|| ln.replace("[X]", ""))
-                    .unwrap_or(ln);
-
-                writeln!(writer, "{ln}{}", cli.task).expect("Unable to write to tmp file");
+            let ln = if cli.task_ids[0] == id {
+                ln.contains("[X]")
+                    .then(|| ln.replace("[X]", "[ ]"))
+                    .unwrap_or(ln)
+                    + &cli.task
             } else {
-                writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-            }
+                ln
+            };
+            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
         };
         // }}}
 
@@ -88,11 +88,11 @@ pub fn run(cli: Cli) {
     } else if cli.edit {
         // Edit a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if cli.task_ids[0] == id {
-                writeln!(writer, "{}", cli.task).expect("Unable to write to tmp file");
-            } else {
-                writeln!(writer, "{ln}").expect("Unable to write to tmp file");
-            }
+            let ln = (cli.task_ids[0] == id)
+                .then(|| "[ ] ".to_owned() + &cli.task)
+                .unwrap_or(ln);
+
+            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
         };
         // }}}
 
@@ -183,25 +183,16 @@ where
 
 fn print_tasks(list: &str, colored: bool) {
     // {{{
-    fn is_done(ln: &str) -> bool {
-        // {{{
-        if ln.contains("[X]") {
-            true
-        } else {
-            false
-        }
-    }
-    // }}}
-
     println!("Tasks:\n");
 
     let file = File::open(list).expect("Unable to open file for reading");
     let reader = BufReader::new(file);
 
     for (id, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
+        let is_done = ln.contains("[X]");
         let id = id + 1;
 
-        if is_done(&ln) && colored {
+        if is_done && colored {
             println!("{id}. \x1b[0;32m{ln} \x1b[0m");
         } else if colored {
             println!("{id}. \x1b[0;31m{ln} \x1b[0m");
@@ -214,7 +205,7 @@ fn print_tasks(list: &str, colored: bool) {
 
 fn add_task(list: &str, task: &str) {
     // {{{
-    let task = task.to_string() + "\n";
+    let task = format!("[ ] {}\n", task.to_string());
 
     let mut list = OpenOptions::new()
         .append(true)

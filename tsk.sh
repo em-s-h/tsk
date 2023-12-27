@@ -19,7 +19,7 @@ _tsk_comp() {
         fi
 
         local item="${items[$id]}"
-        local item="${item/\[*\]/}"
+        local item=$( echo "${item/\[*\]/}" | xargs )
 
         COMPREPLY=( "'$(compgen -W "$item" -- "${COMP_WORDS[3]}")'" )
         IFS="$old_ifs"
