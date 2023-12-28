@@ -4,6 +4,7 @@ use crate::cli::Cli;
 use std::{
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Write},
+    path::PathBuf,
     process,
 };
 
@@ -11,7 +12,7 @@ pub mod cli;
 
 pub fn run(cli: Cli) {
     // {{{
-    let list = get_list();
+    let task_f = get_task_file();
 
     if cli.print_help {
         Cli::print_help();
@@ -20,14 +21,14 @@ pub fn run(cli: Cli) {
         Cli::print_version();
         process::exit(0);
     } else if cli.print {
-        print_tasks(&list, cli.colored_output);
+        print_tasks(&task_f, cli.colored_output);
         process::exit(0);
     }
 
     // Operations {{{
     if cli.add {
         println!("Adding task...");
-        add_task(&list, &cli.task);
+        add_task(&task_f, &cli.task);
     } else if cli.mark_done {
         // Mark tasks as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
@@ -41,7 +42,7 @@ pub fn run(cli: Cli) {
         // }}}
 
         println!("Marking tasks as done...");
-        operate_list(&list, operation);
+        operate_task_file(&task_f, operation);
     } else if cli.unmark_done {
         // Unmark tasks as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
@@ -55,7 +56,7 @@ pub fn run(cli: Cli) {
         // }}}
 
         println!("Unmarking tasks...");
-        operate_list(&list, operation);
+        operate_task_file(&task_f, operation);
     } else if cli.clear_dones {
         // Remove all tasks marked as done operation {{{
         let operation = |writer: &mut BufWriter<File>, _id: usize, ln: String| {
@@ -66,7 +67,7 @@ pub fn run(cli: Cli) {
         // }}}
 
         println!("Clearing tasks...");
-        operate_list(&list, operation);
+        operate_task_file(&task_f, operation);
     } else if cli.append {
         // Append to a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
@@ -83,7 +84,7 @@ pub fn run(cli: Cli) {
         // }}}
 
         println!("Appending content...");
-        operate_list(&list, operation);
+        operate_task_file(&task_f, operation);
     } else if cli.edit {
         // Edit a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
@@ -96,7 +97,7 @@ pub fn run(cli: Cli) {
         // }}}
 
         println!("Editing task...");
-        operate_list(&list, operation);
+        operate_task_file(&task_f, operation);
     } else if cli.move_task {
         // Move a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
@@ -104,7 +105,7 @@ pub fn run(cli: Cli) {
                 let movin_up = cli.task_ids[0] > cli.new_id;
                 let task = {
                     // Get task to be moved {{{
-                    let f = File::open(get_list()).expect("Unable to open file for reading");
+                    let f = File::open(get_task_file()).expect("Unable to open file for reading");
                     let reader = BufReader::new(f);
                     let mut task = String::new();
 
@@ -138,7 +139,7 @@ pub fn run(cli: Cli) {
         // }}}
 
         println!("Moving task...");
-        operate_list(&list, operation);
+        operate_task_file(&task_f, operation);
     } else if cli.delete {
         // Delete a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
@@ -149,25 +150,32 @@ pub fn run(cli: Cli) {
         // }}}
 
         println!("Deleting task...");
-        operate_list(&list, operation);
+        operate_task_file(&task_f, operation);
     }
     // }}}
 
-    print_tasks(&list, cli.colored_output);
+    print_tasks(&task_f, cli.colored_output);
 }
 // }}}
 
-fn operate_list<F>(list: &str, operation: F)
+fn operate_task_file<F>(task_f: &PathBuf, operation: F)
 where
     F: Fn(&mut BufWriter<File>, usize, String),
 {
     // {{{
-    let out_list = list.to_string() + ".tmp";
+    let out_task_f = {
+        // {{{
+        let mut tmp = task_f.clone();
+        tmp.pop();
+        tmp.push("tasks.tmp");
+        tmp
+    };
+    // }}}
 
     // Scope ensures files are closed
     {
-        let file = File::open(list).expect("Unable to open list for reading");
-        let out_file = File::create(&out_list).expect("Unable to create output file");
+        let file = File::open(task_f).expect("Unable to open task file for reading");
+        let out_file = File::create(&out_task_f).expect("Unable to create output file");
 
         let reader = BufReader::new(file);
         let mut writer = BufWriter::new(out_file);
@@ -176,13 +184,13 @@ where
             operation(&mut writer, id, ln);
         }
     }
-    fs::rename(out_list, list).expect("Unable to rename tmp file");
+    fs::rename(out_task_f, task_f).expect("Unable to rename tmp file");
 }
 // }}}
 
-fn print_tasks(list: &str, colored: bool) {
+fn print_tasks(task_f: &PathBuf, colored: bool) {
     // {{{
-    let meta = fs::metadata(list).expect("Unable to obtain file metadata");
+    let meta = fs::metadata(task_f).expect("Unable to obtain file metadata");
     if meta.len() == 0 {
         println!("No tasks to print");
         process::exit(0);
@@ -190,7 +198,7 @@ fn print_tasks(list: &str, colored: bool) {
 
     println!("Tasks:\n");
 
-    let file = File::open(list).expect("Unable to open file for reading");
+    let file = File::open(task_f).expect("Unable to open file for reading");
     let reader = BufReader::new(file);
 
     for (id, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
@@ -208,22 +216,23 @@ fn print_tasks(list: &str, colored: bool) {
 }
 // }}}
 
-fn add_task(list: &str, task: &str) {
+fn add_task(task_f: &PathBuf, task: &str) {
     // {{{
     let task = format!("[ ] {}\n", task.to_string());
 
-    let mut list = OpenOptions::new()
+    let mut task_f = OpenOptions::new()
         .append(true)
-        .open(list)
+        .open(task_f)
         .expect("Unable to open file for writting");
 
-    list.write_all(task.as_bytes())
+    task_f
+        .write_all(task.as_bytes())
         .expect("Unable to write to file");
 }
 // }}}
 
-/// Get the task list
-fn get_list() -> String {
+/// Get the tasks file
+fn get_task_file() -> PathBuf {
     // {{{
     let proj =
         ProjectDirs::from("tsk", "Emilly", "tsk").expect("Unable to create project directory");
@@ -236,7 +245,9 @@ fn get_list() -> String {
     for e in dir_entries {
         if let Ok(f) = e {
             if f.file_name() == "tasks" {
-                return format!("{}/tasks", data_dir.to_str().unwrap());
+                let mut path = data_dir.to_path_buf();
+                path.push("tasks");
+                return path;
             }
         }
     }

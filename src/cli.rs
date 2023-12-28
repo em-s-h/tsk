@@ -13,7 +13,7 @@ const NAME: &str = env!("CARGO_PKG_NAME");
 #[derive(Debug)]
 pub struct Cli {
     // {{{
-    /// The task that will be added to the list
+    /// The task that will be added to the task file
     pub task: String,
 
     /// Id (line number) of the task or tasks to be operated
@@ -28,7 +28,7 @@ pub struct Cli {
 
     pub colored_output: bool,
 
-    /// Print the contents of the list
+    /// Print the contents of the task file
     pub print: bool,
 
     /// Mark a task as done
@@ -40,19 +40,19 @@ pub struct Cli {
     /// Delete all tasks that are marked as done
     pub clear_dones: bool,
 
-    /// Add an task to the list
+    /// Add an task to the task file
     pub add: bool,
 
-    /// Append to an task of the list
+    /// Append to an task of the task file
     pub append: bool,
 
-    /// Rewrite an task of the list
+    /// Rewrite an task of the task file
     pub edit: bool,
 
     /// Move an task to another place
     pub move_task: bool,
 
-    /// Delete an task from the list
+    /// Delete an task from the task file
     pub delete: bool,
 }
 // }}}
@@ -118,11 +118,11 @@ impl Cli {
         }
 
         // Parse task operation related arguments {{{
-        /// Makes sure the id is not above the amount of lines in a list
+        /// Makes sure the id is not above the amount of lines in the task file
         fn check_ids(ids: &[usize]) {
             // {{{
-            let path = crate::get_list();
-            let file = File::open(&path).expect("Unable to open list for reading");
+            let path = crate::get_task_file();
+            let file = File::open(&path).expect("Unable to open task file for reading");
             let line_count = BufReader::new(&file).lines().count();
 
             for id in ids {
