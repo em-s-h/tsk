@@ -139,9 +139,10 @@ impl Cli {
             let mut ids: Vec<usize> = get_next_arg(args)
                 .split(',')
                 .map(|id| {
-                    id.trim()
-                        .parse()
-                        .expect("Please make sure all ids are valid")
+                    id.trim().parse().unwrap_or_else(|_| {
+                        eprintln!("Please make sure all ids are valid");
+                        process::exit(1)
+                    })
                 })
                 .collect();
 
@@ -156,7 +157,7 @@ impl Cli {
             let task = get_next_arg(args);
 
             if task.is_empty() {
-                eprintln!("Please provide the task's content");
+                eprintln!("Please provide the content of the task");
                 process::exit(1);
             }
             task
