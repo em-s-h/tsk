@@ -2,7 +2,7 @@ use directories::ProjectDirs;
 
 use crate::cli::Cli;
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{self, File},
     io::{BufRead, BufReader, BufWriter, Write},
     path::PathBuf,
     process,
@@ -28,8 +28,19 @@ pub fn run(cli: Cli) {
     // Operations {{{
     if cli.add {
         println!("Adding task...");
-        add_task(&task_f, &cli.task);
+
+        // Add task operation {{{
+        let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
+            if id == 0 {
+                writeln!(writer, "[ ] {}", cli.task).expect("Unable to write to tmp file");
+            }
+            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+        };
+        operate_task_file(&task_f, operation);
+        // }}}
     } else if cli.mark_done {
+        println!("Marking tasks as done...");
+
         // Mark tasks as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             let ln = if cli.task_ids.contains(&id) && !ln.contains("[X]") {
@@ -39,11 +50,11 @@ pub fn run(cli: Cli) {
             };
             writeln!(writer, "{ln}").expect("Unable to write to tmp file");
         };
-        // }}}
-
-        println!("Marking tasks as done...");
         operate_task_file(&task_f, operation);
+        // }}}
     } else if cli.unmark_done {
+        println!("Unmarking tasks...");
+
         // Unmark tasks as done operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             let ln = if cli.task_ids.contains(&id) && ln.contains("[X]") {
@@ -53,22 +64,22 @@ pub fn run(cli: Cli) {
             };
             writeln!(writer, "{ln}").expect("Unable to write to tmp file");
         };
-        // }}}
-
-        println!("Unmarking tasks...");
         operate_task_file(&task_f, operation);
+        // }}}
     } else if cli.clear_dones {
+        println!("Clearing tasks...");
+
         // Remove all tasks marked as done operation {{{
         let operation = |writer: &mut BufWriter<File>, _id: usize, ln: String| {
             if !ln.contains("[X]") {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
-        // }}}
-
-        println!("Clearing tasks...");
         operate_task_file(&task_f, operation);
+        // }}}
     } else if cli.append {
+        println!("Appending content...");
+
         // Append to a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             let ln = if cli.task_ids[0] == id {
@@ -81,11 +92,11 @@ pub fn run(cli: Cli) {
             };
             writeln!(writer, "{ln}").expect("Unable to write to tmp file");
         };
-        // }}}
-
-        println!("Appending content...");
         operate_task_file(&task_f, operation);
+        // }}}
     } else if cli.edit {
+        println!("Editing task...");
+
         // Edit a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             let ln = (cli.task_ids[0] == id)
@@ -94,11 +105,11 @@ pub fn run(cli: Cli) {
 
             writeln!(writer, "{ln}").expect("Unable to write to tmp file");
         };
-        // }}}
-
-        println!("Editing task...");
         operate_task_file(&task_f, operation);
+        // }}}
     } else if cli.move_task {
+        println!("Moving task...");
+
         // Move a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if cli.new_id == id {
@@ -136,21 +147,19 @@ pub fn run(cli: Cli) {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
-        // }}}
-
-        println!("Moving task...");
         operate_task_file(&task_f, operation);
+        // }}}
     } else if cli.delete {
+        println!("Deleting task...");
+
         // Delete a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if cli.task_ids[0] != id {
                 writeln!(writer, "{ln}").expect("Unable to write to tmp file");
             }
         };
-        // }}}
-
-        println!("Deleting task...");
         operate_task_file(&task_f, operation);
+        // }}}
     }
     // }}}
 
@@ -195,7 +204,6 @@ fn print_tasks(task_f: &PathBuf, colored: bool) {
         println!("No tasks to print");
         process::exit(0);
     }
-
     println!("Tasks:\n");
 
     let file = File::open(task_f).expect("Unable to open file for reading");
@@ -213,21 +221,6 @@ fn print_tasks(task_f: &PathBuf, colored: bool) {
             println!("{id}. {ln}");
         }
     }
-}
-// }}}
-
-fn add_task(task_f: &PathBuf, task: &str) {
-    // {{{
-    let task = format!("[ ] {}\n", task.to_string());
-
-    let mut task_f = OpenOptions::new()
-        .append(true)
-        .open(task_f)
-        .expect("Unable to open file for writting");
-
-    task_f
-        .write_all(task.as_bytes())
-        .expect("Unable to write to file");
 }
 // }}}
 
