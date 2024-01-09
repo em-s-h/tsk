@@ -32,9 +32,10 @@ pub fn run(cli: Cli) {
         // Add task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if id == 0 {
-                writeln!(writer, "[ ] {}", cli.task).expect("Unable to write to tmp file");
+                writeln!(writer, "[ ] {}", cli.task)
+                    .expect("File has been verified to be writable");
             }
-            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+            writeln!(writer, "{ln}").expect("File has been verified to be writable");
         };
         operate_task_file(&task_f, operation);
         // }}}
@@ -48,7 +49,7 @@ pub fn run(cli: Cli) {
             } else {
                 ln
             };
-            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+            writeln!(writer, "{ln}").expect("File has been verified to be writable");
         };
         operate_task_file(&task_f, operation);
         // }}}
@@ -62,7 +63,7 @@ pub fn run(cli: Cli) {
             } else {
                 ln
             };
-            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+            writeln!(writer, "{ln}").expect("File has been verified to be writable");
         };
         operate_task_file(&task_f, operation);
         // }}}
@@ -72,7 +73,7 @@ pub fn run(cli: Cli) {
         // Remove all tasks marked as done operation {{{
         let operation = |writer: &mut BufWriter<File>, _id: usize, ln: String| {
             if !ln.contains("[X]") {
-                writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+                writeln!(writer, "{ln}").expect("File has been verified to be writable");
             }
         };
         operate_task_file(&task_f, operation);
@@ -90,7 +91,7 @@ pub fn run(cli: Cli) {
             } else {
                 ln
             };
-            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+            writeln!(writer, "{ln}").expect("File has been verified to be writable");
         };
         operate_task_file(&task_f, operation);
         // }}}
@@ -103,7 +104,7 @@ pub fn run(cli: Cli) {
                 .then(|| "[ ] ".to_owned() + &cli.task)
                 .unwrap_or(ln);
 
-            writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+            writeln!(writer, "{ln}").expect("File has been verified to be writable");
         };
         operate_task_file(&task_f, operation);
         // }}}
@@ -116,7 +117,8 @@ pub fn run(cli: Cli) {
                 let movin_up = cli.task_ids[0] > cli.new_id;
                 let task = {
                     // Get task to be moved {{{
-                    let f = File::open(get_task_file()).expect("Unable to open file for reading");
+                    let f =
+                        File::open(get_task_file()).expect("File has been verified to be readable");
                     let reader = BufReader::new(f);
                     let mut task = String::new();
 
@@ -135,16 +137,16 @@ pub fn run(cli: Cli) {
 
                 // Ex.: 1 -> 3
                 if !movin_up {
-                    writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+                    writeln!(writer, "{ln}").expect("File has been verified to be writable");
                 }
-                writeln!(writer, "{task}").expect("Unable to write to tmp file");
+                writeln!(writer, "{task}").expect("File has been verified to be writable");
 
                 // Ex.: 3 -> 1
                 if movin_up {
-                    writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+                    writeln!(writer, "{ln}").expect("File has been verified to be writable");
                 }
             } else if cli.task_ids[0] != id {
-                writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+                writeln!(writer, "{ln}").expect("File has been verified to be writable");
             }
         };
         operate_task_file(&task_f, operation);
@@ -155,7 +157,7 @@ pub fn run(cli: Cli) {
         // Delete a task operation {{{
         let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
             if cli.task_ids[0] != id {
-                writeln!(writer, "{ln}").expect("Unable to write to tmp file");
+                writeln!(writer, "{ln}").expect("File has been verified to be writable");
             }
         };
         operate_task_file(&task_f, operation);
@@ -183,8 +185,12 @@ where
 
     // Scope ensures files are closed
     {
-        let file = File::open(task_f).expect("Unable to open task file for reading");
-        let out_file = File::create(&out_task_f).expect("Unable to create output file");
+        let file = File::open(task_f).expect("File has been verified to be readable");
+        let out_file = File::create(&out_task_f).unwrap_or_else(|e| {
+            eprintln!("Unable to create tmp output file");
+            eprintln!("Err: {e}");
+            process::exit(1)
+        });
 
         let reader = BufReader::new(file);
         let mut writer = BufWriter::new(out_file);
@@ -193,20 +199,28 @@ where
             operation(&mut writer, id, ln);
         }
     }
-    fs::rename(out_task_f, task_f).expect("Unable to rename tmp file");
+    fs::rename(out_task_f, task_f).unwrap_or_else(|e| {
+        eprintln!("Unable to rename tmp file");
+        eprintln!("Err: {e}");
+        process::exit(1)
+    });
 }
 // }}}
 
 fn print_tasks(task_f: &PathBuf, colored: bool) {
     // {{{
-    let meta = fs::metadata(task_f).expect("Unable to obtain file metadata");
+    let meta = fs::metadata(task_f).unwrap_or_else(|e| {
+        eprintln!("Unable to obtain file metadata");
+        eprintln!("Err: {e}");
+        process::exit(1)
+    });
     if meta.len() == 0 {
         println!("No tasks to print");
         process::exit(0);
     }
     println!("Tasks:\n");
 
-    let file = File::open(task_f).expect("Unable to open file for reading");
+    let file = File::open(task_f).expect("File has been verified to be readable");
     let reader = BufReader::new(file);
 
     for (id, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
@@ -227,13 +241,15 @@ fn print_tasks(task_f: &PathBuf, colored: bool) {
 /// Get the tasks file
 fn get_task_file() -> PathBuf {
     // {{{
-    let proj =
-        ProjectDirs::from("tsk", "Emilly", "tsk").expect("Unable to create project directory");
+    let proj = ProjectDirs::from("tsk", "Emilly", "tsk")
+        .expect("Project directory has been verified to exist/be retriavable");
 
     let data_dir = proj.data_local_dir();
-    let dir_entries = data_dir
-        .read_dir()
-        .expect("Unable to read contents of project directory");
+    let dir_entries = data_dir.read_dir().unwrap_or_else(|e| {
+        eprintln!("Unable to read contents of the project directory");
+        eprintln!("Err: {e}");
+        process::exit(1);
+    });
 
     for e in dir_entries {
         if let Ok(f) = e {

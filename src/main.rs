@@ -3,8 +3,10 @@ use std::{fs::File, path::Path, process};
 use tsk::cli::Cli;
 
 fn main() {
-    let proj =
-        ProjectDirs::from("tsk", "Emilly", "tsk").expect("Unable to create project directory");
+    let proj = ProjectDirs::from("tsk", "Emilly", "tsk").unwrap_or_else(|| {
+        eprintln!("Unable to retrieve/create the project directory");
+        process::exit(1)
+    });
 
     let data_dir = proj.data_local_dir();
     let mut tasks_file = data_dir.to_path_buf();
@@ -20,7 +22,18 @@ fn main() {
                 process::exit(1);
             });
         }
-        _ => (),
+        Ok(true) => {
+            // Check if file has write-read permissions {{{
+            use std::fs::OpenOptions;
+            match OpenOptions::new().append(true).read(true).open(&tasks_file) {
+                Ok(_) => (),
+                Err(e) => {
+                    eprintln!("Unable to open 'tasks' file for reading & writting");
+                    eprintln!("Err: {e}");
+                    process::exit(1)
+                }
+            }
+        } // }}}
     }
 
     let cli = Cli::new().parse_args();

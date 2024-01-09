@@ -122,7 +122,7 @@ impl Cli {
         fn check_ids(ids: &[usize]) {
             // {{{
             let path = crate::get_task_file();
-            let file = File::open(&path).expect("Unable to open task file for reading");
+            let file = File::open(&path).expect("File has been verified to be readable");
             let line_count = BufReader::new(&file).lines().count();
 
             for id in ids {
