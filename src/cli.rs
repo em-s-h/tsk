@@ -1,5 +1,6 @@
 use std::{
-    env::{self, Args},
+    env::{self},
+    fmt::Debug,
     fs::File,
     io::{BufRead, BufReader},
     process,
@@ -21,10 +22,6 @@ pub struct Cli {
 
     /// Used when moving tasks
     pub new_id: usize,
-
-    pub print_help: bool,
-
-    pub print_version: bool,
 
     pub colored_output: bool,
 
@@ -66,10 +63,7 @@ impl Cli {
             task_ids: vec![0],
             new_id: 0,
 
-            print_help: false,
-            print_version: false,
             colored_output: true,
-
             print: false,
             mark_done: false,
             unmark_done: false,
@@ -85,7 +79,10 @@ impl Cli {
 
     pub fn parse_args(mut self) -> Self {
         // {{{
-        fn get_next_arg(args: &mut Args) -> String {
+        fn get_next_arg<T>(args: &mut T) -> String
+        where
+            T: Iterator<Item = String>,
+        {
             // {{{
             match args.next() {
                 Some(a) => a,
@@ -94,20 +91,32 @@ impl Cli {
         }
         // }}}
 
-        let mut args = env::args();
+        let is_opt = |a: &str| a.starts_with("--") || a.starts_with('-');
+
+        let mut args = env::args().filter(|a| !is_opt(a));
         args.next(); // First argument is unneeded
 
-        let mut arg = get_next_arg(&mut args);
-        if arg == "--help" || arg == "-h" {
-            self.print_help = true;
-            return self;
-        } else if arg == "--version" || arg == "-v" {
-            self.print_version = true;
-            return self;
-        } else if arg == "--no-color" {
+        let arg = get_next_arg(&mut args);
+
+        // Parse the first option passed to the program {{{
+        let opt = env::args()
+            .filter(|a| is_opt(a))
+            .next()
+            .unwrap_or_else(|| String::new());
+
+        if opt == "--help" || opt == "-h" {
+            Cli::print_help();
+            process::exit(0)
+        } else if opt == "--version" || opt == "-v" {
+            Cli::print_version();
+            process::exit(0)
+        } else if opt == "--no-color" {
             self.colored_output = false;
-            arg = get_next_arg(&mut args);
+        } else if !opt.is_empty() {
+            eprintln!("Invalid option: '{opt}'");
+            process::exit(1);
         }
+        // }}}
 
         if arg == "print" || arg.is_empty() {
             self.print = true;
@@ -134,7 +143,10 @@ impl Cli {
         }
         // }}}
 
-        fn get_task_ids(args: &mut Args) -> Vec<usize> {
+        fn get_task_ids<T>(args: &mut T) -> Vec<usize>
+        where
+            T: Iterator<Item = String> + Debug,
+        {
             // {{{
             let mut ids: Vec<usize> = get_next_arg(args)
                 .split(',')
@@ -152,7 +164,10 @@ impl Cli {
         }
         // }}}
 
-        fn get_task_content(args: &mut Args) -> String {
+        fn get_task_content<T>(args: &mut T) -> String
+        where
+            T: Iterator<Item = String>,
+        {
             // {{{
             let task = get_next_arg(args);
 

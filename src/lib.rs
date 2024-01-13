@@ -14,13 +14,7 @@ pub fn run(cli: Cli) {
     // {{{
     let task_f = get_task_file();
 
-    if cli.print_help {
-        Cli::print_help();
-        process::exit(0);
-    } else if cli.print_version {
-        Cli::print_version();
-        process::exit(0);
-    } else if cli.print {
+    if cli.print {
         print_tasks(&task_f, cli.colored_output);
         process::exit(0);
     }
