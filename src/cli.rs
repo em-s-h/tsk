@@ -11,6 +11,15 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 const AUTHOR: &str = env!("CARGO_PKG_AUTHORS");
 const NAME: &str = env!("CARGO_PKG_NAME");
 
+#[derive(Debug, PartialEq)]
+/// Indicates the position to add the new task
+pub enum AddOpt {
+    // {{{
+    Top,
+    Bottom,
+}
+// }}}
+
 #[derive(Debug)]
 pub struct Cli {
     // {{{
@@ -39,6 +48,9 @@ pub struct Cli {
 
     /// Add an task to the task file
     pub add: bool,
+
+    /// Where to add the new task
+    pub add_to: AddOpt,
 
     /// Append to an task of the task file
     pub append: bool,
@@ -69,6 +81,7 @@ impl Cli {
             unmark_done: false,
             clear_dones: false,
             add: false,
+            add_to: AddOpt::Top,
             append: false,
             edit: false,
             move_task: false,
@@ -79,7 +92,7 @@ impl Cli {
 
     pub fn parse_args(mut self) -> Self {
         // {{{
-        fn get_next_arg<T>(args: &mut T) -> String
+        fn get_next<T>(args: &mut T) -> String
         where
             T: Iterator<Item = String>,
         {
@@ -91,19 +104,12 @@ impl Cli {
         }
         // }}}
 
-        let is_opt = |a: &str| a.starts_with("--") || a.starts_with('-');
-
-        let mut args = env::args().filter(|a| !is_opt(a));
+        let mut args = env::args();
         args.next(); // First argument is unneeded
 
-        let arg = get_next_arg(&mut args);
+        let opt = get_next(&mut args);
 
         // Parse the first option passed to the program {{{
-        let opt = env::args()
-            .filter(|a| is_opt(a))
-            .next()
-            .unwrap_or_else(|| String::new());
-
         if opt == "--help" || opt == "-h" {
             Cli::print_help();
             process::exit(0)
@@ -112,11 +118,18 @@ impl Cli {
             process::exit(0)
         } else if opt == "--no-color" {
             self.colored_output = false;
-        } else if !opt.is_empty() {
-            eprintln!("Invalid option: '{opt}'");
-            process::exit(1);
+        } else if opt.starts_with('-') {
+            eprintln!("Invalid option {opt}");
+            process::exit(1)
         }
         // }}}
+
+        // In case the user passes the '--no-color' option
+        let arg = if opt.starts_with('-') {
+            get_next(&mut args)
+        } else {
+            opt
+        };
 
         if arg == "print" || arg.is_empty() {
             self.print = true;
@@ -127,19 +140,11 @@ impl Cli {
         }
 
         // Parse task operation related arguments {{{
-        /// Makes sure the id is not above the amount of lines in the task file
-        fn check_ids(ids: &[usize]) {
+        fn get_line_count() -> usize {
             // {{{
             let path = crate::get_task_file();
             let file = File::open(&path).expect("File has been verified to be readable");
-            let line_count = BufReader::new(&file).lines().count();
-
-            for id in ids {
-                if id.to_owned() > line_count {
-                    eprintln!("The id:{id} is above the last id");
-                    process::exit(1);
-                }
-            }
+            BufReader::new(&file).lines().count()
         }
         // }}}
 
@@ -148,38 +153,62 @@ impl Cli {
             T: Iterator<Item = String> + Debug,
         {
             // {{{
-            let mut ids: Vec<usize> = get_next_arg(args)
-                .split(',')
-                .map(|id| {
-                    id.trim().parse().unwrap_or_else(|_| {
-                        eprintln!("Please make sure all ids are valid");
-                        process::exit(1)
+            let arg = get_next(args);
+            let get_vec = |pat: &str| {
+                // {{{
+                arg.split(pat)
+                    .map(|id| {
+                        id.trim().parse().unwrap_or_else(|_| {
+                            eprintln!("Please make sure all ids are valid");
+                            process::exit(1)
+                        })
                     })
-                })
-                .collect();
+                    .collect()
+            };
+            // }}}
 
-            ids.sort();
-            ids.dedup();
+            let ids: Vec<usize> = if arg.contains("..") {
+                // {{{
+                let v: Vec<usize> = get_vec("..");
+                (v[0]..=v[1]).collect()
+            } else if arg.contains(',') {
+                let mut v: Vec<usize> = get_vec(",");
+                v.sort();
+                v.dedup();
+                v
+            } else if arg == "-all" {
+                let ln_count = get_line_count();
+                (1..=ln_count).collect()
+            } else {
+                vec![arg.trim().parse().unwrap_or_else(|_| {
+                    eprintln!("Please make sure the id is valid");
+                    process::exit(1)
+                })]
+            };
+            // }}}
+
+            let is_valid = ids // {{{
+                .iter()
+                .find(|&id| {
+                    let path = crate::get_task_file();
+                    let file = File::open(&path).expect("File has been verified to be readable");
+                    let line_count = BufReader::new(&file).lines().count();
+
+                    *id > line_count
+                })
+                .is_none();
+            // }}}
+
+            if !is_valid {
+                eprintln!("Please make sure the ids are not above the last one");
+                process::exit(1)
+            }
             ids
         }
         // }}}
 
-        fn get_task_content<T>(args: &mut T) -> String
-        where
-            T: Iterator<Item = String>,
-        {
-            // {{{
-            let task = get_next_arg(args);
-
-            if task.is_empty() {
-                eprintln!("Please provide the content of the task");
-                process::exit(1);
-            }
-            task
-        }
-        // }}}
-
         match arg.as_str() {
+            // Operations {{{
             "do" => self.mark_done = true,
             "undo" => self.unmark_done = true,
             "add" => self.add = true,
@@ -192,6 +221,7 @@ impl Cli {
                 process::exit(1)
             }
         }
+        // }}}
 
         let requires_id = self.mark_done // {{{
             || self.unmark_done
@@ -204,19 +234,44 @@ impl Cli {
         if requires_id {
             self.task_ids = get_task_ids(&mut args);
 
-            check_ids(&self.task_ids);
             // -1 because lines are counted from 0
             self.task_ids = self.task_ids.iter().map(|id| id - 1).collect();
         }
 
-        if self.add || self.append || self.edit {
-            self.task = get_task_content(&mut args);
+        if self.add {
+            // 'add' options {{{
+            let opt = get_next(&mut args);
+
+            if opt == "-bot" {
+                self.add_to = AddOpt::Bottom
+            } else if opt.starts_with('-') && opt != "-top" {
+                eprintln!("Invalid operation option: {opt}");
+                eprintln!("Valid options are '-bot' and '-top'");
+                process::exit(1)
+            } else {
+                self.task = if !opt.is_empty() {
+                    opt
+                } else {
+                    eprintln!("Please provide the content of the task");
+                    process::exit(1);
+                }
+            }
+        }
+        // }}}
+
+        if self.append || self.edit {
+            let task = get_next(&mut args);
+
+            if task.is_empty() {
+                eprintln!("Please provide the content of the task");
+                process::exit(1);
+            }
+            self.task = task
         }
 
         if self.move_task {
+            // {{{
             self.new_id = get_task_ids(&mut args)[0];
-
-            check_ids(&[self.new_id]);
             self.new_id -= 1;
 
             if self.new_id == self.task_ids[0] {
@@ -224,6 +279,7 @@ impl Cli {
                 process::exit(1);
             }
         }
+        // }}}
         // }}}
 
         self

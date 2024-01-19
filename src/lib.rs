@@ -1,8 +1,8 @@
 use directories::ProjectDirs;
 
-use crate::cli::Cli;
+use crate::cli::{AddOpt, Cli};
 use std::{
-    fs::{self, File},
+    fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Write},
     path::PathBuf,
     process,
@@ -24,14 +24,28 @@ pub fn run(cli: Cli) {
         println!("Adding task...");
 
         // Add task operation {{{
-        let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
-            if id == 0 {
-                writeln!(writer, "[ ] {}", cli.task)
-                    .expect("File has been verified to be writable");
-            }
-            writeln!(writer, "{ln}").expect("File has been verified to be writable");
-        };
-        operate_task_file(&task_f, operation);
+        if cli.add_to == AddOpt::Top {
+            let operation = |writer: &mut BufWriter<File>, id: usize, ln: String| {
+                if id == 0 {
+                    writeln!(writer, "[ ] {}", cli.task)
+                        .expect("File has been verified to be writable");
+                }
+                writeln!(writer, "{ln}").expect("File has been verified to be writable");
+            };
+            operate_task_file(&task_f, operation);
+        } else {
+            let s = format!("[ ] {}\n", cli.task);
+            let mut f = OpenOptions::new()
+                .append(true)
+                .open(&task_f)
+                .expect("File has been verified to be openable");
+
+            f.write_all(s.as_bytes()).unwrap_or_else(|e| {
+                eprintln!("Error while writting to 'tasks' file");
+                eprintln!("Err: {e}");
+                process::exit(1)
+            })
+        }
         // }}}
     } else if cli.mark_done {
         println!("Marking tasks as done...");
