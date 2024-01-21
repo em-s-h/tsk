@@ -295,7 +295,7 @@ impl Cli {
             "{NAME}: {DESCRIPTION}
 Made by: {AUTHOR}
 
-Usage: {NAME} [Options] [Command] [Args]
+Usage: {NAME} [Options] [Command] [Sub-Options] [Args]
 
 Options:
     --help      -h
@@ -307,7 +307,7 @@ Options:
 
 Commands:
     print
-        Print all tasks
+        Print tasks
         Default when not passing any args
     clear   
         Delete all tasks that are marked as done
@@ -324,7 +324,15 @@ Commands:
     move    <task_id> <new_task_id>
         Move a task to a new location
     delete  <task_ids>
-        Delete 1 or more tasks"
+        Delete 1 task
+
+Sub-Options:
+    -top
+        Used by 'add' to add tasks to the top of the task list
+    -bot
+        Used by 'add' to add tasks to the bottom of the task list
+    -all
+        Used by 'do' & 'undo' to un/mark all tasks as done"
         );
     }
     // }}}
