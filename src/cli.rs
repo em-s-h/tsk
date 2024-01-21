@@ -93,12 +93,12 @@ impl Cli {
     pub fn parse_args(mut self) -> Self {
         // {{{
         fn get_next<T>(args: &mut T) -> String
+        // {{{
         where
             T: Iterator<Item = String>,
         {
-            // {{{
             match args.next() {
-                Some(a) => a,
+                Some(a) => a.trim().to_owned(),
                 _ => String::new(),
             }
         }
@@ -119,7 +119,7 @@ impl Cli {
         } else if opt == "--no-color" {
             self.colored_output = false;
         } else if opt.starts_with('-') {
-            eprintln!("Invalid option {opt}");
+            eprintln!("Invalid option '{opt}'");
             process::exit(1)
         }
         // }}}
@@ -149,23 +149,31 @@ impl Cli {
         // }}}
 
         fn get_task_ids<T>(args: &mut T) -> Vec<usize>
+        // {{{
         where
             T: Iterator<Item = String> + Debug,
         {
-            // {{{
             let arg = get_next(args);
             let get_vec = |pat: &str| {
                 // {{{
                 arg.split(pat)
                     .map(|id| {
                         id.trim().parse().unwrap_or_else(|_| {
-                            eprintln!("Please make sure all ids are valid");
+                            eprintln!("Invalid id: '{id}'");
                             process::exit(1)
                         })
                     })
                     .collect()
             };
             // }}}
+
+            if arg == "-all" {
+                let ln_count = get_line_count();
+                return (1..=ln_count).collect();
+            } else if arg.starts_with('-') {
+                eprintln!("Invalid operation option: '{arg}'");
+                process::exit(1);
+            }
 
             let ids: Vec<usize> = if arg.contains("..") {
                 // {{{
@@ -176,12 +184,9 @@ impl Cli {
                 v.sort();
                 v.dedup();
                 v
-            } else if arg == "-all" {
-                let ln_count = get_line_count();
-                (1..=ln_count).collect()
             } else {
                 vec![arg.trim().parse().unwrap_or_else(|_| {
-                    eprintln!("Please make sure the id is valid");
+                    eprintln!("Invalid id: '{arg}'");
                     process::exit(1)
                 })]
             };
@@ -200,7 +205,7 @@ impl Cli {
             // }}}
 
             if !is_valid {
-                eprintln!("Please make sure the ids are not above the last one");
+                eprintln!("Please make sure the ids are valid");
                 process::exit(1)
             }
             ids
@@ -217,7 +222,7 @@ impl Cli {
             "move" => self.move_task = true,
             "delete" => self.delete = true,
             _ => {
-                eprintln!("{arg} is not a valid argument");
+                eprintln!("'{arg}' is not a valid argument");
                 process::exit(1)
             }
         }
@@ -237,31 +242,28 @@ impl Cli {
             // -1 because lines are counted from 0
             self.task_ids = self.task_ids.iter().map(|id| id - 1).collect();
         }
+        let opt = get_next(&mut args);
 
-        if self.add {
+        if self.add && opt.starts_with('-') {
             // 'add' options {{{
-            let opt = get_next(&mut args);
 
             if opt == "-bot" {
-                self.add_to = AddOpt::Bottom
-            } else if opt.starts_with('-') && opt != "-top" {
-                eprintln!("Invalid operation option: {opt}");
+                self.add_to = AddOpt::Bottom;
+            } else if opt != "-top" {
+                eprintln!("Invalid operation option: '{opt}'");
                 eprintln!("Valid options are '-bot' and '-top'");
                 process::exit(1)
-            } else {
-                self.task = if !opt.is_empty() {
-                    opt
-                } else {
-                    eprintln!("Please provide the content of the task");
-                    process::exit(1);
-                }
             }
         }
         // }}}
 
-        if self.append || self.edit {
-            let task = get_next(&mut args);
+        let task = if opt.starts_with('-') {
+            get_next(&mut args)
+        } else {
+            opt
+        };
 
+        if self.add || self.append || self.edit {
             if task.is_empty() {
                 eprintln!("Please provide the content of the task");
                 process::exit(1);
@@ -280,6 +282,7 @@ impl Cli {
             }
         }
         // }}}
+
         // }}}
 
         self
