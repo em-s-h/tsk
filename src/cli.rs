@@ -104,7 +104,7 @@ impl Cli {
         }
         // }}}
 
-        let mut args = env::args();
+        let mut args = env::args().peekable();
         args.next(); // First argument is unneeded
 
         let opt = get_next(&mut args);
@@ -242,10 +242,16 @@ impl Cli {
             // -1 because lines are counted from 0
             self.task_ids = self.task_ids.iter().map(|id| id - 1).collect();
         }
-        let opt = get_next(&mut args);
 
-        if self.add && opt.starts_with('-') {
+        let is_opt = {
+            let def = String::new();
+            let next = args.peek().unwrap_or(&def);
+            next.starts_with('-')
+        };
+
+        if self.add && is_opt {
             // 'add' options {{{
+            let opt = get_next(&mut args);
 
             if opt == "-bot" {
                 self.add_to = AddOpt::Bottom;
@@ -257,13 +263,8 @@ impl Cli {
         }
         // }}}
 
-        let task = if opt.starts_with('-') {
-            get_next(&mut args)
-        } else {
-            opt
-        };
-
         if self.add || self.append || self.edit {
+            let task = get_next(&mut args);
             if task.is_empty() {
                 eprintln!("Please provide the content of the task");
                 process::exit(1);

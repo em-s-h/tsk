@@ -1,6 +1,6 @@
 [package]
 name = "tsk"
-version = "1.3.17"
+version = "1.3.18"
 description = "A simple task manager"
 edition = "2021"
 authors = [ "Emilly M.S./S.H." ]
