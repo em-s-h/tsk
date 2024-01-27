@@ -269,11 +269,10 @@ impl Cli {
                 eprintln!("Please provide the content of the task");
                 process::exit(1);
             }
-            self.task = task
+            self.task = task.replace("[ ]", "").replace("[X]", "").trim().to_owned()
         }
 
         if self.move_task {
-            // {{{
             self.new_id = get_task_ids(&mut args)[0];
             self.new_id -= 1;
 
@@ -282,8 +281,6 @@ impl Cli {
                 process::exit(1);
             }
         }
-        // }}}
-
         // }}}
 
         self
