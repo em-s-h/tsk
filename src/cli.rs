@@ -37,20 +37,20 @@ pub struct Cli {
     /// Print the contents of the task file
     pub print: bool,
 
+    /// Add an task to the task file
+    pub add: bool,
+
+    /// Where to add the new task
+    pub add_to: AddOpt,
+
     /// Mark a task as done
     pub mark_done: bool,
 
     /// Unmark a task as done
     pub unmark_done: bool,
 
-    /// Delete all tasks that are marked as done
-    pub clear_dones: bool,
-
-    /// Add an task to the task file
-    pub add: bool,
-
-    /// Where to add the new task
-    pub add_to: AddOpt,
+    /// Move an task to another place
+    pub move_task: bool,
 
     /// Append to an task of the task file
     pub append: bool,
@@ -58,11 +58,11 @@ pub struct Cli {
     /// Rewrite an task of the task file
     pub edit: bool,
 
-    /// Move an task to another place
-    pub move_task: bool,
-
     /// Delete an task from the task file
     pub delete: bool,
+
+    /// Delete all tasks that are marked as done
+    pub clear_dones: bool,
 }
 // }}}
 
@@ -307,22 +307,22 @@ Commands:
     print
         Print tasks
         Default when not passing any args
-    clear   
-        Delete all tasks that are marked as done
+    add     <task>
+        Add a new task
     do      <task_ids>
         Mark 1 or more tasks as done
     undo    <task_ids>
         Unmark 1 or more tasks as done
-    add     <task>
-        Add a new task
+    move    <task_id> <new_task_id>
+        Move a task to a new location
     append  <task_id> <content>
         Append content to an existing task
     edit    <task_id> <new_task>
         Replace the contents of a task
-    move    <task_id> <new_task_id>
-        Move a task to a new location
     delete  <task_ids>
         Delete 1 task
+    clear   
+        Delete all tasks that are marked as done
 
 Sub-Options:
     -top

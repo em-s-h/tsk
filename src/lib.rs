@@ -96,22 +96,29 @@ where
     };
     // }}}
 
-    // Scope ensures files are closed
-    {
-        let file = File::open(task_f).expect("File has been verified to be readable");
-        let out_file = File::create(&out_task_f).unwrap_or_else(|e| {
-            eprintln!("Unable to create tmp output file");
-            eprintln!("Err: {e}");
-            process::exit(1)
-        });
+    let out_file = File::create(&out_task_f).unwrap_or_else(|e| {
+        eprintln!("Unable to create tmp output file");
+        eprintln!("Err: {e}");
+        process::exit(1)
+    });
+    let meta = fs::metadata(task_f).unwrap_or_else(|e| {
+        eprintln!("Unable to obtain file metadata");
+        eprintln!("Err: {e}");
+        process::exit(1)
+    });
+    let mut writer = BufWriter::new(out_file);
 
+    if meta.len() != 0 {
+        let file = File::open(task_f).expect("File has been verified to be readable");
         let reader = BufReader::new(file);
-        let mut writer = BufWriter::new(out_file);
 
         for (id, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
             operation(&mut writer, id, ln);
         }
+    } else {
+        operation(&mut writer, 0, String::new());
     }
+
     fs::rename(out_task_f, task_f).unwrap_or_else(|e| {
         eprintln!("Unable to rename tmp file");
         eprintln!("Err: {e}");
@@ -132,7 +139,9 @@ fn add_task(task_f: &PathBuf, task: &str, place: &AddOpt) {
                     writeln!(writer, "[ ] {}", task)
                         .expect("File has been verified to be writable");
                 }
-                writeln!(writer, "{ln}").expect("File has been verified to be writable");
+                if !ln.is_empty() {
+                    writeln!(writer, "{ln}").expect("File has been verified to be writable");
+                }
             },
         );
     } else {
@@ -169,46 +178,6 @@ fn mark_task(task_f: &PathBuf, ids: &Vec<usize>, m_type: MarkType) {
             } else {
                 ln
             };
-            writeln!(writer, "{ln}").expect("File has been verified to be writable");
-        },
-    );
-}
-// }}}
-
-fn append_to_task(task_f: &PathBuf, id: usize, content: &str) {
-    // {{{
-    println!("Appending content...");
-
-    operate_task_file(
-        &task_f,
-        |writer: &mut BufWriter<File>, f_id: usize, ln: String| {
-            let ln = if id == f_id {
-                ln.contains("[X]")
-                    .then(|| ln.replace("[X]", "[ ]"))
-                    .unwrap_or(ln)
-                    + content
-            } else {
-                ln
-            };
-            writeln!(writer, "{ln}").expect("File has been verified to be writable");
-        },
-    );
-}
-// }}}
-
-fn edit_task(task_f: &PathBuf, id: usize, new_content: &str) {
-    // {{{
-    println!("Editing task...");
-
-    operate_task_file(
-        &task_f,
-        |writer: &mut BufWriter<File>, f_id: usize, ln: String| {
-            let ln = if id == f_id {
-                format!("[ ] {new_content}")
-            } else {
-                ln
-            };
-
             writeln!(writer, "{ln}").expect("File has been verified to be writable");
         },
     );
@@ -262,16 +231,41 @@ fn move_task(task_f: &PathBuf, from: usize, to: usize) {
 }
 // }}}
 
-fn clear_dones(task_f: &PathBuf) {
+fn append_to_task(task_f: &PathBuf, id: usize, content: &str) {
     // {{{
-    println!("Clearing tasks...");
+    println!("Appending content...");
 
     operate_task_file(
         &task_f,
-        |writer: &mut BufWriter<File>, _: usize, ln: String| {
-            if !ln.contains("[X]") {
-                writeln!(writer, "{ln}").expect("File has been verified to be writable");
-            }
+        |writer: &mut BufWriter<File>, f_id: usize, ln: String| {
+            let ln = if id == f_id {
+                ln.contains("[X]")
+                    .then(|| ln.replace("[X]", "[ ]"))
+                    .unwrap_or(ln)
+                    + content
+            } else {
+                ln
+            };
+            writeln!(writer, "{ln}").expect("File has been verified to be writable");
+        },
+    );
+}
+// }}}
+
+fn edit_task(task_f: &PathBuf, id: usize, new_content: &str) {
+    // {{{
+    println!("Editing task...");
+
+    operate_task_file(
+        &task_f,
+        |writer: &mut BufWriter<File>, f_id: usize, ln: String| {
+            let ln = if id == f_id {
+                format!("[ ] {new_content}")
+            } else {
+                ln
+            };
+
+            writeln!(writer, "{ln}").expect("File has been verified to be writable");
         },
     );
 }
@@ -285,6 +279,21 @@ fn delete_task(task_f: &PathBuf, id: usize) {
         &task_f,
         |writer: &mut BufWriter<File>, f_id: usize, ln: String| {
             if id != f_id {
+                writeln!(writer, "{ln}").expect("File has been verified to be writable");
+            }
+        },
+    );
+}
+// }}}
+
+fn clear_dones(task_f: &PathBuf) {
+    // {{{
+    println!("Clearing tasks...");
+
+    operate_task_file(
+        &task_f,
+        |writer: &mut BufWriter<File>, _: usize, ln: String| {
+            if !ln.contains("[X]") {
                 writeln!(writer, "{ln}").expect("File has been verified to be writable");
             }
         },
