@@ -239,10 +239,11 @@ fn append_to_task(task_f: &PathBuf, id: usize, content: &str) {
         &task_f,
         |writer: &mut BufWriter<File>, f_id: usize, ln: String| {
             let ln = if id == f_id {
-                ln.contains("[X]")
+                let ln = ln
+                    .contains("[X]")
                     .then(|| ln.replace("[X]", "[ ]"))
-                    .unwrap_or(ln)
-                    + content
+                    .unwrap_or(ln);
+                format!("{ln} {content}")
             } else {
                 ln
             };
@@ -516,11 +517,11 @@ mod test {
         // {{{
         let f = get_done_test_file();
 
-        let content = " New content";
+        let content = "New content";
         let og_task = "Test line 0";
 
         append_to_task(&f, 0, content);
-        let new_task = format!("[ ] {og_task}{content}");
+        let new_task = format!("[ ] {og_task} {content}");
         let first_ln = {
             // {{{
             let f = File::open(&f).unwrap_or_else(|e| {
