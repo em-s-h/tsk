@@ -33,35 +33,21 @@ pub struct Cli {
     pub new_id: usize,
 
     pub colored_output: bool,
-
-    /// Print the contents of the task file
     pub print: bool,
 
-    /// Add an task to the task file
-    pub add: bool,
-
-    /// Where to add the new task
+    pub add_task: bool,
     pub add_to: AddOpt,
 
-    /// Mark a task as done
     pub mark_done: bool,
-
-    /// Unmark a task as done
     pub unmark_done: bool,
 
-    /// Move an task to another place
     pub move_task: bool,
+    pub swap_tasks: bool,
 
-    /// Append to an task of the task file
-    pub append: bool,
+    pub append_task: bool,
+    pub edit_task: bool,
 
-    /// Rewrite an task of the task file
-    pub edit: bool,
-
-    /// Delete an task from the task file
-    pub delete: bool,
-
-    /// Delete all tasks that are marked as done
+    pub delete_task: bool,
     pub clear_dones: bool,
 }
 // }}}
@@ -79,13 +65,14 @@ impl Cli {
             print: false,
             mark_done: false,
             unmark_done: false,
-            clear_dones: false,
-            add: false,
+            add_task: false,
             add_to: AddOpt::Top,
-            append: false,
-            edit: false,
+            append_task: false,
+            edit_task: false,
             move_task: false,
-            delete: false,
+            swap_tasks: false,
+            delete_task: false,
+            clear_dones: false,
         }
     }
     // }}}
@@ -139,7 +126,6 @@ impl Cli {
             return self;
         }
 
-        // Parse task operation related arguments {{{
         fn get_line_count() -> usize {
             // {{{
             let path = crate::get_task_file();
@@ -186,26 +172,22 @@ impl Cli {
                 v
             } else {
                 vec![arg.trim().parse().unwrap_or_else(|_| {
-                    eprintln!("Invalid id: '{arg}'");
+                    eprintln!("Invalid id: {arg}");
                     process::exit(1)
                 })]
             };
             // }}}
 
-            let is_valid = ids // {{{
-                .iter()
-                .find(|&id| {
-                    let path = crate::get_task_file();
-                    let file = File::open(&path).expect("File has been verified to be readable");
-                    let line_count = BufReader::new(&file).lines().count();
+            let line_count = {
+                let path = crate::get_task_file();
+                let file = File::open(&path).expect("File has been verified to be readable");
+                BufReader::new(&file).lines().count()
+            };
+            let invalid_id = ids.iter().find(|&id| *id > line_count);
 
-                    *id > line_count
-                })
-                .is_none();
-            // }}}
-
-            if !is_valid {
-                eprintln!("Please make sure the ids are valid");
+            if let Some(id) = invalid_id {
+                eprintln!("Invalid id: {id}");
+                eprintln!("Please make sure ids are bellow {line_count}");
                 process::exit(1)
             }
             ids
@@ -216,11 +198,12 @@ impl Cli {
             // Operations {{{
             "do" => self.mark_done = true,
             "undo" => self.unmark_done = true,
-            "add" => self.add = true,
-            "append" => self.append = true,
-            "edit" => self.edit = true,
+            "add" => self.add_task = true,
+            "append" => self.append_task = true,
+            "edit" => self.edit_task = true,
             "move" => self.move_task = true,
-            "delete" => self.delete = true,
+            "swap" => self.swap_tasks = true,
+            "delete" => self.delete_task = true,
             _ => {
                 eprintln!("'{arg}' is not a valid argument");
                 process::exit(1)
@@ -228,12 +211,14 @@ impl Cli {
         }
         // }}}
 
-        let requires_id = self.mark_done // {{{
+        let requires_id = self.mark_done
+        // {{{
             || self.unmark_done
-            || self.append
-            || self.edit
+            || self.append_task
+            || self.edit_task
             || self.move_task
-            || self.delete;
+            || self.swap_tasks
+            || self.delete_task;
         // }}}
 
         if requires_id {
@@ -249,7 +234,7 @@ impl Cli {
             next.starts_with('-')
         };
 
-        if self.add && is_opt {
+        if self.add_task && is_opt {
             // 'add' options {{{
             let opt = get_next(&mut args);
 
@@ -263,7 +248,7 @@ impl Cli {
         }
         // }}}
 
-        if self.add || self.append || self.edit {
+        if self.add_task || self.append_task || self.edit_task {
             let task = get_next(&mut args);
             if task.is_empty() {
                 eprintln!("Please provide the content of the task");
@@ -272,7 +257,7 @@ impl Cli {
             self.task = task.replace("[ ]", "").replace("[X]", "").trim().to_owned()
         }
 
-        if self.move_task {
+        if self.move_task || self.swap_tasks {
             self.new_id = get_task_ids(&mut args)[0];
             self.new_id -= 1;
 
@@ -281,8 +266,6 @@ impl Cli {
                 process::exit(1);
             }
         }
-        // }}}
-
         self
     }
     // }}}
@@ -315,6 +298,8 @@ Commands:
         Unmark 1 or more tasks as done
     move    <task_id> <new_task_id>
         Move a task to a new location
+    swap    <task_id> <other_task_id>
+        Swap the places of two tasks
     append  <task_id> <content>
         Append content to an existing task
     edit    <task_id> <new_task>

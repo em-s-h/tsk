@@ -28,22 +28,24 @@ pub fn run(cli: Cli) {
     }
 
     // Operations {{{
-    if cli.add {
+    if cli.add_task {
         add_task(&task_f, &cli.task, &cli.add_to)
     } else if cli.mark_done {
         mark_task(&task_f, &cli.task_ids, MarkType::Done)
     } else if cli.unmark_done {
         mark_task(&task_f, &cli.task_ids, MarkType::Undone)
-    } else if cli.clear_dones {
-        clear_dones(&task_f)
-    } else if cli.append {
-        append_to_task(&task_f, cli.task_ids[0], &cli.task)
-    } else if cli.edit {
-        edit_task(&task_f, cli.task_ids[0], &cli.task)
     } else if cli.move_task {
         move_task(&task_f, cli.task_ids[0], cli.new_id)
-    } else if cli.delete {
+    } else if cli.swap_tasks {
+        swap_tasks(&task_f, cli.task_ids[0], cli.new_id)
+    } else if cli.append_task {
+        append_to_task(&task_f, cli.task_ids[0], &cli.task)
+    } else if cli.edit_task {
+        edit_task(&task_f, cli.task_ids[0], &cli.task)
+    } else if cli.delete_task {
         delete_task(&task_f, cli.task_ids[0])
+    } else if cli.clear_dones {
+        clear_dones(&task_f)
     }
     // }}}
 
@@ -126,6 +128,8 @@ where
     });
 }
 // }}}
+
+// Operations {{{
 
 fn add_task(task_f: &PathBuf, task: &str, place: &AddOpt) {
     // {{{
@@ -231,6 +235,47 @@ fn move_task(task_f: &PathBuf, from: usize, to: usize) {
 }
 // }}}
 
+fn swap_tasks(task_f: &PathBuf, id1: usize, id2: usize) {
+    // {{{
+    println!("Swapping tasks...");
+
+    let (task1, task2) = {
+        // Get tasks to be swapped {{{
+        let f = File::open(task_f).expect("File has been verified to be readable");
+        let reader = BufReader::new(f);
+        let mut task1 = String::new();
+        let mut task2 = String::new();
+
+        for (i, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
+            if i == id1 {
+                task1 = ln;
+            } else if i == id2 {
+                task2 = ln
+            }
+        }
+        if task1.is_empty() || task2.is_empty() {
+            eprintln!("Unable to find the tasks to swap");
+            process::exit(1);
+        }
+        (task1, task2)
+    };
+    // }}}
+
+    operate_task_file(
+        &task_f,
+        |writer: &mut BufWriter<File>, id: usize, ln: String| {
+            if id1 == id {
+                writeln!(writer, "{task2}").expect("File has been verified to be writable");
+            } else if id2 == id {
+                writeln!(writer, "{task1}").expect("File has been verified to be writable");
+            } else {
+                writeln!(writer, "{ln}").expect("File has been verified to be writable");
+            }
+        },
+    );
+}
+// }}}
+
 fn append_to_task(task_f: &PathBuf, id: usize, content: &str) {
     // {{{
     println!("Appending content...");
@@ -300,6 +345,8 @@ fn clear_dones(task_f: &PathBuf) {
         },
     );
 }
+// }}}
+
 // }}}
 
 fn get_task_file() -> PathBuf {
@@ -614,6 +661,56 @@ mod test {
         // }}}
 
         assert_eq!(first_ln, last_ln)
+    }
+    // }}}
+
+    // 'move_task' tests {{{
+    #[test]
+    fn test_swap_task() {
+        let f = get_test_file();
+        let first_ln = "[ ] Test line 0";
+        let last_ln = "[ ] Test line 4";
+
+        swap_tasks(&f, 0, 4);
+        let new_first_ln = {
+            // {{{
+            let f = File::open(&f).unwrap_or_else(|e| {
+                eprintln!("Unable to open file");
+                eprintln!("Err: {e}");
+                process::exit(1);
+            });
+
+            BufReader::new(&f)
+                .lines()
+                .map(|l| l.unwrap())
+                .next()
+                .unwrap_or_else(|| {
+                    eprintln!("Unable to obtain last line of file");
+                    process::exit(1)
+                })
+        };
+        // }}}
+        let new_last_ln = {
+            // {{{
+            let f = File::open(&f).unwrap_or_else(|e| {
+                eprintln!("Unable to open file");
+                eprintln!("Err: {e}");
+                process::exit(1);
+            });
+
+            BufReader::new(&f)
+                .lines()
+                .map(|l| l.unwrap())
+                .last()
+                .unwrap_or_else(|| {
+                    eprintln!("Unable to obtain last line of file");
+                    process::exit(1)
+                })
+        };
+        // }}}
+
+        assert_eq!(first_ln, new_last_ln);
+        assert_eq!(last_ln, new_first_ln)
     }
     // }}}
 

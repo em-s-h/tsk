@@ -374,6 +374,27 @@ echo
 # }}}
 
 echo -e "|-------------------------------------------------|\n"
+echo -e "Testing 'swap' command:\n"
+reset_file
+
+# {{{
+
+echo "Test: Swap first with last"
+## {{{
+first_ln=$(get_first_ln) ; last_ln=$(get_last_ln)
+out=$(tsk_d swap 1 5)
+if [[ $show_out ]]; then
+    echo "$out"
+fi
+
+new_first_ln=$(get_first_ln) ; new_last_ln=$(get_last_ln)
+check "$first_ln" "$new_last_ln" ; check "$last_ln" "$new_first_ln"
+echo
+## }}}
+
+# }}}
+
+echo -e "|-------------------------------------------------|\n"
 echo -e "Testing 'append' command:\n"
 reset_file "done"
 
