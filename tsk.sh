@@ -1,19 +1,22 @@
 #!/bin/bash
 
 _tsk_comp() {
-    case "${COMP_WORDS[1]}" in
-        "add"|"do"|"undo"|"move"|"swap"|"append"|"edit"|"delete") 
-        ;;
-        *) [[ ${#COMP_WORDS[@]} -ne 2 ]] && return
-        ;;
-    esac
+    # These commands don't require additional args.
+    local leave_comp="print clear"
+    if [[ $leave_comp =~ "${COMP_WORDS[1]}" && ${#COMP_WORDS[@]} -ne 2 ]]; then
+        return
+    fi
 
-    local comps=( $(compgen -W "--help --version --no-color print add do undo move swap append edit delete clear" -- "${COMP_WORDS[1]}") )
     local req_id="do undo move swap append edit delete"
     local req_sec_id="move swap"
     local all_opt="do undo"
 
-    if [[ $req_id =~ "${COMP_WORDS[1]}" && ${#COMP_WORDS[@]} -eq 3 ]]; then
+    # Complete options
+    if [[ ${COMP_WORDS[1]} =~ "-" && ${#COMP_WORDS[@]} -le 2 ]]; then
+        COMPREPLY=( $(compgen -W "--help --version --no-color" -- "${COMP_WORDS[COMP_CWORD]}") )
+
+    # Complete id
+    elif [[ $req_id =~ "${COMP_WORDS[1]}" && ${#COMP_WORDS[@]} -eq 3 ]]; then
         local ids=$(_get_ids)
         if [[ -z $ids ]]; then
             return
@@ -22,18 +25,22 @@ _tsk_comp() {
             ids="$ids -all"
         fi
 
-        COMPREPLY=( $(compgen -W "$ids" -- "${COMP_WORDS[2]}") )
+        COMPREPLY=( $(compgen -W "$ids" -- "${COMP_WORDS[COMP_CWORD]}") )
 
-    elif [[ ${COMP_WORDS[1]} == "add" && ${#COMP_WORDS[@]} -eq 3 ]]; then
-        COMPREPLY=( $(compgen -W "-top -bot" -- "${COMP_WORDS[2]}") )
-
+    # Complete secondary id
     elif [[ $req_sec_id =~ "${COMP_WORDS[1]}" && ${#COMP_WORDS[@]} -eq 4 ]]; then
         local ids=$(_get_ids)
         if [[ -z $ids ]]; then
             return
         fi
-        COMPREPLY=( $(compgen -W "$ids" -- "${COMP_WORDS[3]}") )
+        local ids=$(echo "${ids} " | sed "s/${COMP_WORDS[2]}\s//")
+        COMPREPLY=( $(compgen -W "$ids" -- "${COMP_WORDS[COMP_CWORD]}") )
 
+    # Complete "add" sub-options
+    elif [[ ${COMP_WORDS[1]} == "add" && ${#COMP_WORDS[@]} -eq 3 ]]; then
+        COMPREPLY=( $(compgen -W "-top -bot" -- "${COMP_WORDS[COMP_CWORD]}") )
+
+    # Complete task to be edited
     elif [[ ${COMP_WORDS[1]} == "edit" && ${#COMP_WORDS[@]} -eq 4 ]]; then
         # {{{
         local old_ifs="$IFS"
@@ -50,12 +57,13 @@ _tsk_comp() {
         local item="${items[$id]}"
         local item=$( echo "${item/\[*\]/}" | xargs )
 
-        COMPREPLY=( "'$(compgen -W "$item" -- "${COMP_WORDS[3]}")'" )
+        COMPREPLY=( "'$(compgen -W "$item" -- "${COMP_WORDS[COMP_CWORD]}")'" )
         IFS="$old_ifs"
         # }}}
 
+    # Normal complete
     elif [[ ${#COMP_WORDS[@]} -le 2 ]]; then
-        COMPREPLY=("${comps[@]}")
+        COMPREPLY=( $(compgen -W "print add $req_id clear" -- "${COMP_WORDS[COMP_CWORD]}") )
     fi
 }
 
