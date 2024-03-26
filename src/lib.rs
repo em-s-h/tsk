@@ -71,7 +71,7 @@ fn print_tasks(task_f: &PathBuf, colored: bool) {
 
     for (id, ln) in reader.lines().map(|l| l.unwrap()).enumerate() {
         let is_done = ln.contains("[X]");
-        let id = id + 1;
+        let id = format!("{:>2}", id + 1);
 
         if is_done && colored {
             println!("{id}. \x1b[0;32m{ln} \x1b[0m");
