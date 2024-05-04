@@ -1,24 +1,10 @@
-use std::{
-    env::{self},
-    fmt::Debug,
-    fs::File,
-    io::{BufRead, BufReader},
-    process,
-};
+use crate::task_file::{AddPosition, TaskFile};
+use std::{env, fmt::Debug, process};
 
 const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const AUTHOR: &str = env!("CARGO_PKG_AUTHORS");
 const NAME: &str = env!("CARGO_PKG_NAME");
-
-#[derive(Debug, PartialEq)]
-/// Indicates the position to add the new task
-pub enum AddOpt {
-    // {{{
-    Top,
-    Bottom,
-}
-// }}}
 
 #[derive(Debug)]
 pub struct Cli {
@@ -36,7 +22,7 @@ pub struct Cli {
     pub print: bool,
 
     pub add_task: bool,
-    pub add_to: AddOpt,
+    pub add_to: AddPosition,
 
     pub mark_done: bool,
     pub unmark_done: bool,
@@ -66,7 +52,7 @@ impl Cli {
             mark_done: false,
             unmark_done: false,
             add_task: false,
-            add_to: AddOpt::Top,
+            add_to: AddPosition::Top,
             append_task: false,
             edit_task: false,
             move_task: false,
@@ -126,11 +112,11 @@ impl Cli {
             return self;
         }
 
-        fn get_line_count() -> usize {
+        fn get_task_count() -> usize {
             // {{{
-            let path = crate::get_task_file();
-            let file = File::open(&path).expect("File has been verified to be readable");
-            BufReader::new(&file).lines().count()
+            let path = crate::get_task_file_path();
+            let tf = TaskFile::parse_file(&path);
+            tf.tasks.len()
         }
         // }}}
 
@@ -154,7 +140,7 @@ impl Cli {
             // }}}
 
             if arg == "-all" {
-                let ln_count = get_line_count();
+                let ln_count = get_task_count();
                 return (1..=ln_count).collect();
             } else if arg.starts_with('-') {
                 eprintln!("Invalid operation option: '{arg}'");
@@ -178,11 +164,7 @@ impl Cli {
             };
             // }}}
 
-            let line_count = {
-                let path = crate::get_task_file();
-                let file = File::open(&path).expect("File has been verified to be readable");
-                BufReader::new(&file).lines().count()
-            };
+            let line_count = get_task_count();
             let invalid_id = ids.iter().find(|&id| *id > line_count);
 
             if let Some(id) = invalid_id {
@@ -239,7 +221,7 @@ impl Cli {
             let opt = get_next(&mut args);
 
             if opt == "-bot" {
-                self.add_to = AddOpt::Bottom;
+                self.add_to = AddPosition::Bottom;
             } else if opt != "-top" {
                 eprintln!("Invalid operation option: '{opt}'");
                 eprintln!("Valid options are '-bot' and '-top'");
@@ -254,7 +236,7 @@ impl Cli {
                 eprintln!("Please provide the content of the task");
                 process::exit(1);
             }
-            self.task = task.replace("[ ]", "").replace("[X]", "").trim().to_owned()
+            self.task = task
         }
 
         if self.move_task || self.swap_tasks {
