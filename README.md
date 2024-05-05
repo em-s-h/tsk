@@ -10,8 +10,8 @@ page
 
 ### Bash completions
 
-1. Copy the contents of the file `tsk.sh`
-2. Paste it in your .bashrc file or a file that is sourced by it
+1. Copy the contents of the file `tsk_completions.bash`
+2. Paste it in your .bashrc file or in a file that is sourced by it
 
 ## Building from source
 
@@ -27,5 +27,5 @@ Before tsk came to be I liked to use [please](https://github.com/NayamAmarshe/pl
 my tasks, but over time I started to have problems with its features, such as `move 2 6` not moving
 2 to the position 6 but instead swapping 2 to 6.
 
-So, because I don't know python, I decided to make a similar program that had the features I wanted
-out of a simple task manager.
+So, because python isn't my strong suit, I decided to make a similar program that had the features I
+wanted out of a simple task manager.
