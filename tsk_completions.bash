@@ -25,7 +25,7 @@ _tsk_comp() {
 
     # Normal complete
     elif [[ ${#COMP_WORDS[@]} -le 2 ]]; then
-        COMPREPLY=( $(compgen -W "print add $req_id clear" -- "${COMP_WORDS[COMP_CWORD]}") )
+        COMPREPLY=( $(compgen -W "print add do undo move swap append edit delete clear" -- "${COMP_WORDS[COMP_CWORD]}") )
     fi
 }
 

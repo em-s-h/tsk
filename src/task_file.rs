@@ -19,9 +19,9 @@ pub struct TaskFile {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Task {
     // {{{
-    // id: usize,
     contents: String,
     done: bool,
+    subtasks: Vec<Task>,
 }
 // }}}
 
@@ -38,6 +38,7 @@ impl TaskFile {
                 tasks: vec![Task {
                     contents: "Create a new task file".to_owned(),
                     done: true,
+                    subtasks: Vec::new(),
                 }],
             };
         }
@@ -69,37 +70,86 @@ impl TaskFile {
 
     pub fn print(&self, colored: bool) {
         // {{{
+        fn _print(tasks: &[Task], colored: bool, parent_id: &str) {
+            // {{{
+            let depth = parent_id.split('.').count() - 1;
+            let parent_id = parent_id.trim();
+
+            for (id, t) in tasks.iter().enumerate() {
+                let mut id = {
+                    if depth == 0 {
+                        format!("{:>2}", id + 1)
+                    } else {
+                        format!("{parent_id}{}", id + 1)
+                    }
+                };
+                for _i in 0..depth {
+                    id.insert_str(0, "     ");
+                }
+
+                if t.done && colored {
+                    println!("{id}. \x1b[0;32m[X] {} \x1b[0m", t.contents);
+                } else if colored {
+                    println!("{id}. \x1b[0;31m[ ] {} \x1b[0m", t.contents);
+                } else if t.done {
+                    println!("{id}. [X] {}", t.contents);
+                } else {
+                    println!("{id}. [ ] {}", t.contents);
+                }
+
+                if t.subtasks.len() > 0 {
+                    _print(&t.subtasks, colored, format!("{id}.").as_str())
+                }
+            }
+        }
+        // }}}
+
         if self.tasks.len() == 0 {
             println!("No tasks to print");
             return;
         }
         println!("Tasks:\n");
 
-        for (id, t) in self.tasks.iter().enumerate() {
-            let id = format!("{:>2}", id + 1);
-            let task = if t.done {
-                format!("[X] {}", t.contents)
-            } else {
-                format!("[ ] {}", t.contents)
-            };
-            if t.done && colored {
-                println!("{id}. \x1b[0;32m{task} \x1b[0m");
-            } else if colored {
-                println!("{id}. \x1b[0;31m{task} \x1b[0m");
-            } else {
-                println!("{id}. {task}");
-            }
-        }
+        _print(&self.tasks, colored, "")
     }
     // }}}
 
-    pub fn add_task(&mut self, task: &str, pos: &AddPosition) {
+    pub fn add_task(&mut self, task: &str, pos: &AddPosition, sub_id: &str) {
         // {{{
+        fn _add(tasks: &mut [Task], task: Task, pos: &AddPosition, ids: &[usize], depth: usize) {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if id + 1 == ids[depth] && ids.len() == depth + 1 {
+                    if pos == &AddPosition::Top {
+                        t.subtasks.insert(0, task)
+                    } else {
+                        t.subtasks.push(task)
+                    }
+                    return;
+                } else if id + 1 == ids[depth] {
+                    _add(&mut t.subtasks, task, pos, ids, depth + 1);
+                    return;
+                }
+            }
+        }
+        // }}}
+
         println!("Adding task...");
         let task = Task {
             contents: task.to_owned(),
             done: false,
+            subtasks: Vec::new(),
         };
+
+        if !sub_id.is_empty() {
+            let ids: Vec<usize> = sub_id
+                .split('.')
+                .map(|i| i.parse().expect("Ids verified to be usize"))
+                .collect();
+            _add(&mut self.tasks, task, pos, &ids, 0);
+            return;
+        }
+
         if pos == &AddPosition::Top {
             self.tasks.insert(0, task)
         } else {
@@ -195,10 +245,12 @@ mod test {
                 Task {
                     contents: "one".to_owned(),
                     done: false,
+                    subtasks: Vec::new(),
                 },
                 Task {
                     contents: "two".to_owned(),
                     done: false,
+                    subtasks: Vec::new(),
                 },
             ],
         }
@@ -212,13 +264,33 @@ mod test {
                 Task {
                     contents: "one".to_owned(),
                     done: true,
+                    subtasks: Vec::new(),
                 },
                 Task {
                     contents: "two".to_owned(),
                     done: true,
+                    subtasks: Vec::new(),
                 },
             ],
         }
+    }
+    // }}}
+
+    #[test]
+    #[ignore]
+    fn test_print() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.tasks[0].subtasks.push(Task {
+            contents: "sub".to_owned(),
+            done: false,
+            subtasks: vec![Task {
+                contents: "sub".to_owned(),
+                done: false,
+                subtasks: Vec::new(),
+            }],
+        });
+        tf.print(true);
     }
     // }}}
 
@@ -227,9 +299,8 @@ mod test {
     fn test_add_task_top() {
         // {{{
         let mut tf = get_test_task_file();
-        tf.add_task("three", &AddPosition::Top);
+        tf.add_task("three", &AddPosition::Top, "");
 
-        assert_eq!(tf.tasks.len(), 3);
         assert_eq!(tf.tasks[0].contents, "three");
         assert_eq!(tf.tasks[1].contents, "one");
         assert_eq!(tf.tasks[2].contents, "two")
@@ -240,12 +311,71 @@ mod test {
     fn test_add_task_bot() {
         // {{{
         let mut tf = get_test_task_file();
-        tf.add_task("three", &AddPosition::Bottom);
+        tf.add_task("three", &AddPosition::Bottom, "");
 
-        assert_eq!(tf.tasks.len(), 3);
         assert_eq!(tf.tasks[0].contents, "one");
         assert_eq!(tf.tasks[1].contents, "two");
         assert_eq!(tf.tasks[2].contents, "three");
+    }
+    // }}}
+
+    #[test]
+    fn test_add_sub_top() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.add_task("sub", &AddPosition::Top, "2");
+
+        assert_eq!(tf.tasks[0].contents, "one");
+        assert_eq!(tf.tasks[1].contents, "two");
+        assert_eq!(tf.tasks[1].subtasks[0].contents, "sub");
+    }
+    // }}}
+
+    #[test]
+    fn test_add_sub_bot() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.add_task("sub2", &AddPosition::Top, "2");
+        tf.add_task("sub1", &AddPosition::Top, "2");
+        tf.add_task("sub3", &AddPosition::Bottom, "2");
+
+        assert_eq!(tf.tasks[0].contents, "one");
+        assert_eq!(tf.tasks[1].contents, "two");
+        assert_eq!(tf.tasks[1].subtasks[0].contents, "sub1");
+        assert_eq!(tf.tasks[1].subtasks[1].contents, "sub2");
+        assert_eq!(tf.tasks[1].subtasks[2].contents, "sub3");
+    }
+    // }}}
+
+    #[test]
+    fn test_add_sub_sub_bot() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.add_task("sub1", &AddPosition::Top, "2");
+        tf.add_task("subsub2", &AddPosition::Top, "2.1");
+        tf.add_task("subsub1", &AddPosition::Top, "2.1");
+        tf.add_task("subsub3", &AddPosition::Bottom, "2.1");
+
+        assert_eq!(tf.tasks[0].contents, "one");
+        assert_eq!(tf.tasks[1].contents, "two");
+        assert_eq!(tf.tasks[1].subtasks[0].contents, "sub1");
+        assert_eq!(tf.tasks[1].subtasks[0].subtasks[0].contents, "subsub1");
+        assert_eq!(tf.tasks[1].subtasks[0].subtasks[1].contents, "subsub2");
+        assert_eq!(tf.tasks[1].subtasks[0].subtasks[2].contents, "subsub3");
+    }
+    // }}}
+
+    #[test]
+    fn test_add_sub_sub_top() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.add_task("sub", &AddPosition::Top, "2");
+        tf.add_task("subsub", &AddPosition::Top, "2.1");
+
+        assert_eq!(tf.tasks[0].contents, "one");
+        assert_eq!(tf.tasks[1].contents, "two");
+        assert_eq!(tf.tasks[1].subtasks[0].contents, "sub");
+        assert_eq!(tf.tasks[1].subtasks[0].subtasks[0].contents, "subsub");
     }
     // }}}
     // }}}
@@ -317,7 +447,7 @@ mod test {
     fn test_move_task_up() {
         // {{{
         let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Bottom);
+        tf.add_task("other", &AddPosition::Bottom, "");
         tf.move_task(2, 0);
 
         assert_eq!(tf.tasks.len(), 3);
@@ -331,7 +461,7 @@ mod test {
     fn test_move_task_down() {
         // {{{
         let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Top);
+        tf.add_task("other", &AddPosition::Top, "");
         tf.move_task(0, 2);
 
         assert_eq!(tf.tasks.len(), 3);
@@ -345,7 +475,7 @@ mod test {
     fn test_move_task_same_ids() {
         // {{{
         let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Top);
+        tf.add_task("other", &AddPosition::Top, "");
         tf.move_task(0, 0);
 
         assert_eq!(tf.tasks.len(), 3);
@@ -361,7 +491,7 @@ mod test {
     fn test_swap_tasks() {
         // {{{
         let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Top);
+        tf.add_task("other", &AddPosition::Top, "");
         tf.swap_tasks(0, 2);
 
         assert_eq!(tf.tasks.len(), 3);
@@ -375,7 +505,7 @@ mod test {
     fn test_swap_tasks_same_ids() {
         // {{{
         let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Top);
+        tf.add_task("other", &AddPosition::Top, "");
         tf.swap_tasks(0, 0);
 
         assert_eq!(tf.tasks.len(), 3);

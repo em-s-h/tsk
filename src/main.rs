@@ -23,7 +23,7 @@ fn main() {
 
     // Operations {{{
     if cli.add_task {
-        task_file.add_task(&cli.task, &cli.add_to)
+        task_file.add_task(&cli.task, &cli.add_to, "0")
     } else if cli.mark_done {
         task_file.mark_tasks(&cli.task_ids, true)
     } else if cli.unmark_done {
