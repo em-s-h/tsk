@@ -22,22 +22,28 @@ fn main() {
     }
 
     // Operations {{{
+    let single_id = cli.task_ids[0].clone();
+
     if cli.add_task {
-        task_file.add_task(&cli.task, &cli.add_to)
+        task_file.add_task(&cli.task, &cli.add_to, &single_id)
+        //
     } else if cli.mark_done {
         task_file.mark_tasks(&cli.task_ids, true)
     } else if cli.unmark_done {
         task_file.mark_tasks(&cli.task_ids, false)
+        //
     } else if cli.move_task {
-        task_file.move_task(cli.task_ids[0], cli.new_id)
+        task_file.move_task(&single_id, &cli.new_id)
     } else if cli.swap_tasks {
-        task_file.swap_tasks(cli.task_ids[0], cli.new_id)
+        task_file.swap_tasks(&single_id, &cli.new_id)
+        //
     } else if cli.append_task {
-        task_file.append_to_task(cli.task_ids[0], &cli.task)
+        task_file.append_to_task(&single_id, &cli.task)
     } else if cli.edit_task {
-        task_file.edit_task(cli.task_ids[0], &cli.task)
+        task_file.edit_task(&single_id, &cli.task)
+        //
     } else if cli.delete_task {
-        task_file.delete_task(cli.task_ids[0])
+        task_file.delete_task(&single_id)
     } else if cli.clear_dones {
         task_file.clear_dones()
     }
@@ -45,7 +51,6 @@ fn main() {
 
     task_file.print(cli.colored_output);
     task_file.save_to_file(&file_path)
-    // tsk::run(cli);
 }
 
 pub fn get_task_file_path() -> PathBuf {
@@ -81,3 +86,7 @@ pub fn get_task_file_path() -> PathBuf {
     tasks_file
 }
 // }}}
+
+// Required for integration tests
+#[cfg(test)]
+mod tests {}

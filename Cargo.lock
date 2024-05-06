@@ -189,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "tsk"
-version = "1.4.0"
+version = "3.0.0"
 dependencies = [
  "directories",
  "serde",

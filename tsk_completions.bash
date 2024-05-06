@@ -6,9 +6,6 @@ _tsk_comp() {
     if [[ $leave_comp =~ "${COMP_WORDS[1]}" && ${#COMP_WORDS[@]} -ne 2 ]]; then
         return
     fi
-
-    #local req_id="do undo move swap append edit delete"
-    #local req_sec_id="move swap"
     local all_opt="do undo"
 
     # Complete options
@@ -21,11 +18,11 @@ _tsk_comp() {
 
     # Complete "add" sub-options
     elif [[ ${COMP_WORDS[1]} == "add" && ${#COMP_WORDS[@]} -eq 3 ]]; then
-        COMPREPLY=( $(compgen -W "-top -bot" -- "${COMP_WORDS[COMP_CWORD]}") )
+        COMPREPLY=( $(compgen -W "-top -bot -sub" -- "${COMP_WORDS[COMP_CWORD]}") )
 
     # Normal complete
     elif [[ ${#COMP_WORDS[@]} -le 2 ]]; then
-        COMPREPLY=( $(compgen -W "print add $req_id clear" -- "${COMP_WORDS[COMP_CWORD]}") )
+        COMPREPLY=( $(compgen -W "print add do undo move swap append edit delete clear" -- "${COMP_WORDS[COMP_CWORD]}") )
     fi
 }
 
