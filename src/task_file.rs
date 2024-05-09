@@ -115,20 +115,20 @@ impl TaskFile {
     }
     // }}}
 
-    pub fn add_task(&mut self, task: &str, pos: &AddPosition, parent_id: &str) {
+    pub fn add_task(&mut self, task: &str, pos: &AddPosition, id: &str) {
         // {{{
-        fn _add(tasks: &mut [Task], task: Task, pos: &AddPosition, p_id: &[usize], depth: usize) {
+        fn _add(tasks: &mut [Task], task: Task, pos: &AddPosition, s_id: &[usize], depth: usize) {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
-                if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
+                if id + 1 == s_id[depth] && s_id.len() - 1 == depth {
                     if pos == &AddPosition::Top {
                         t.subtasks.insert(0, task)
                     } else {
                         t.subtasks.push(task)
                     }
                     return;
-                } else if id + 1 == p_id[depth] {
-                    _add(&mut t.subtasks, task, pos, p_id, depth + 1);
+                } else if id + 1 == s_id[depth] {
+                    _add(&mut t.subtasks, task, pos, s_id, depth + 1);
                     return;
                 }
             }
@@ -142,20 +142,18 @@ impl TaskFile {
             subtasks: Vec::new(),
         };
 
-        if !parent_id.is_empty() {
-            let p_id: Vec<usize> = parent_id
-                .split_terminator('.')
-                .map(|i| i.parse().unwrap())
-                .collect();
-            _add(&mut self.tasks, task, pos, &p_id, 0);
+        if !id.contains('.') {
+            if pos == &AddPosition::Top {
+                self.tasks.insert(0, task)
+            } else {
+                self.tasks.push(task)
+            }
             return;
         }
 
-        if pos == &AddPosition::Top {
-            self.tasks.insert(0, task)
-        } else {
-            self.tasks.push(task)
-        }
+        let s_id = Self::get_subtask_id(&id);
+        _add(&mut self.tasks, task, pos, &s_id, 0);
+        return;
     }
     // }}}
 
@@ -320,45 +318,130 @@ impl TaskFile {
     }
     // }}}
 
-    pub fn append_to_task(&mut self, id: usize, content: &str) {
+    pub fn append_to_task(&mut self, id: &str, content: &str) {
         // {{{
+        fn _append(tasks: &mut [Task], content: &str, s_id: &[usize], depth: usize) {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if id + 1 == s_id[depth] && s_id.len() - 1 == depth {
+                    t.contents.push_str(content);
+                    t.done = false;
+                    return;
+                } else if id + 1 == s_id[depth] {
+                    _append(&mut t.subtasks, content, s_id, depth + 1);
+                    return;
+                }
+            }
+        }
+        // }}}
+
         println!("Appending content...");
-        self.tasks[id].contents.push_str(content);
-        self.tasks[id].done = false
+        let content = format!(" {content}");
+        if !id.contains('.') {
+            let id: usize = id.parse().unwrap();
+            self.tasks[id - 1].contents.push_str(&content);
+            self.tasks[id - 1].done = false;
+            return;
+        }
+
+        let s_id: Vec<usize> = id.split('.').map(|i| i.parse().unwrap()).collect();
+        _append(&mut self.tasks, &content, &s_id, 0)
     }
     // }}}
 
-    pub fn edit_task(&mut self, id: usize, new_content: &str) {
+    pub fn edit_task(&mut self, id: &str, new_content: &str) {
         // {{{
+        fn _edit(tasks: &mut [Task], new_content: &str, s_id: &[usize], depth: usize) {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if id + 1 == s_id[depth] && s_id.len() - 1 == depth {
+                    t.contents = new_content.to_owned();
+                    t.done = false;
+                    return;
+                } else if id + 1 == s_id[depth] {
+                    _edit(&mut t.subtasks, new_content, s_id, depth + 1);
+                    return;
+                }
+            }
+        }
+        // }}}
+
         println!("Editing task...");
-        self.tasks[id].contents = new_content.to_owned();
-        self.tasks[id].done = false
+        if !id.contains('.') {
+            let id: usize = id.parse().unwrap();
+            self.tasks[id - 1].contents = new_content.to_owned();
+            self.tasks[id - 1].done = false;
+            return;
+        }
+
+        let s_id: Vec<usize> = id.split('.').map(|i| i.parse().unwrap()).collect();
+        _edit(&mut self.tasks, new_content, &s_id, 0)
     }
     // }}}
 
-    pub fn delete_task(&mut self, id: usize) {
+    pub fn delete_task(&mut self, id: &str) {
         // {{{
+        fn _delete(tasks: &mut [Task], s_id: &[usize], depth: usize) {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if id + 1 == s_id[depth] && s_id.len() - 1 == depth + 1 {
+                    t.subtasks.remove(s_id[depth] - 1);
+                    return;
+                } else if id + 1 == s_id[depth] {
+                    _delete(&mut t.subtasks, s_id, depth + 1);
+                    return;
+                }
+            }
+        }
+        // }}}
+
         println!("Deleting task...");
-        self.tasks.remove(id);
+        if !id.contains('.') {
+            let id: usize = id.parse().unwrap();
+            self.tasks.remove(id - 1);
+            return;
+        }
+        let s_id = Self::get_subtask_id(id);
+        _delete(&mut self.tasks, &s_id, 0)
     }
     // }}}
 
     pub fn clear_dones(&mut self) {
         // {{{
-        println!("Clearing done tasks...");
-        let mut dones: Vec<usize> = Vec::new();
-        for (id, t) in self.tasks.iter().enumerate() {
-            if t.done {
-                dones.push(id)
+        fn _clear(tasks: &mut [Task]) {
+            // {{{
+            for t in tasks.iter_mut() {
+                t.subtasks = t
+                    .subtasks
+                    .iter()
+                    .filter(|t| !t.done)
+                    .map(|t| t.to_owned())
+                    .collect();
+
+                if t.subtasks.len() != 0 {
+                    _clear(&mut t.subtasks)
+                }
             }
         }
-        dones.reverse();
+        // }}}
 
-        for id in dones {
-            self.tasks.remove(id);
+        println!("Clearing done tasks...");
+        self.tasks = self
+            .tasks
+            .iter()
+            .filter(|t| !t.done)
+            .map(|t| t.to_owned())
+            .collect();
+
+        if self.tasks.len() != 0 {
+            _clear(&mut self.tasks);
         }
     }
     // }}}
+
+    fn get_subtask_id(v: &str) -> Vec<usize> {
+        v.split('.').map(|i| i.parse().unwrap()).collect()
+    }
 }
 // }}}
 

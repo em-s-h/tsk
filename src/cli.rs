@@ -211,16 +211,16 @@ impl Cli {
                     process::exit(1)
                 }
 
-                let from: usize = t.1.parse().expect("Verified to be usize");
+                let from: usize = t.1.parse().unwrap();
                 let to: usize = v[1].parse().unwrap_or_else(|_| {
                     eprintln!("Invalid subtask id: '{arg}'");
                     process::exit(1)
                 });
 
-                let (last_id, from) = if from == 0 {
-                    (get_task_count(), t.0.parse().expect("Verified to be usize"))
+                let last_id = if from == 0 {
+                    get_task_count()
                 } else {
-                    (get_subtask_count(&t.0), from)
+                    get_subtask_count(&t.0)
                 };
 
                 if to > last_id {
@@ -228,8 +228,11 @@ impl Cli {
                     process::exit(1)
                 }
                 let mut ret: Vec<String> = Vec::new();
-                if from != 0 {
+                let from = if from == 0 {
+                    t.0.parse().unwrap()
+                } else {
                     ret.push(format!("{}.", t.0));
+                    from
                 };
 
                 for i in from..=to {

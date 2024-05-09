@@ -29,7 +29,7 @@ fn main() {
     };
 
     if cli.add_task {
-        task_file.add_task(&cli.task, &cli.add_to, &cli.task_ids[0])
+        task_file.add_task(&cli.task, &cli.add_to, &single_id)
         //
     } else if cli.mark_done {
         task_file.mark_tasks(&cli.task_ids, true)
@@ -42,12 +42,12 @@ fn main() {
         task_file.swap_tasks(&single_id, &cli.new_id)
         //
     } else if cli.append_task {
-        task_file.append_to_task(cli.task_ids[0].parse().unwrap(), &cli.task)
+        task_file.append_to_task(&single_id, &cli.task)
     } else if cli.edit_task {
-        task_file.edit_task(cli.task_ids[0].parse().unwrap(), &cli.task)
+        task_file.edit_task(&single_id, &cli.task)
         //
     } else if cli.delete_task {
-        task_file.delete_task(cli.task_ids[0].parse().unwrap())
+        task_file.delete_task(&single_id)
     } else if cli.clear_dones {
         task_file.clear_dones()
     }
