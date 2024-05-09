@@ -50,7 +50,7 @@ impl Cli {
         Self {
             task: String::new(),
             task_ids: vec![String::new()],
-            new_id: 0,
+            new_id: String::new(),
 
             colored_output: true,
             print: false,
@@ -375,9 +375,17 @@ impl Cli {
 
         if self.move_task || self.swap_tasks {
             let v = get_task_ids(&mut args);
-            self.new_id = format!("{}{}", v[0], v[1]);
+            self.new_id = if v[0].contains('.') {
+                format!("{}{}", v[0], v[1])
+            } else {
+                v[0].clone()
+            };
 
-            let s = format!("{}{}", self.task_ids[0], self.task_ids[1]);
+            let s = if self.task_ids[0].contains('.') {
+                format!("{}{}", self.task_ids[0], self.task_ids[1])
+            } else {
+                self.task_ids[0].clone()
+            };
             if self.new_id == s {
                 eprintln!("Please provide different task ids");
                 process::exit(1);

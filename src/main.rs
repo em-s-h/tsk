@@ -22,10 +22,10 @@ fn main() {
     }
 
     // Operations {{{
-    let single_id = if cli.task_ids.len() > 2 {
+    let single_id = if cli.task_ids[0].contains('.') {
         format!("{}{}", cli.task_ids[0], cli.task_ids[1])
     } else {
-        String::new()
+        cli.task_ids[0].clone()
     };
 
     if cli.add_task {

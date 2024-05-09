@@ -145,7 +145,7 @@ impl TaskFile {
         if !parent_id.is_empty() {
             let p_id: Vec<usize> = parent_id
                 .split_terminator('.')
-                .map(|i| i.parse().expect("Ids verified to be usize"))
+                .map(|i| i.parse().unwrap())
                 .collect();
             _add(&mut self.tasks, task, pos, &p_id, 0);
             return;
@@ -196,13 +196,9 @@ impl TaskFile {
         if ids[0].contains('.') {
             let parent_id: Vec<usize> = ids[0]
                 .split_terminator('.')
-                .map(|i| i.parse().expect("Verified to be usize"))
+                .map(|i| i.parse().unwrap())
                 .collect();
-            let ids: Vec<usize> = ids
-                .iter()
-                .skip(1)
-                .map(|i| i.parse().expect("Verified to be usize"))
-                .collect();
+            let ids: Vec<usize> = ids.iter().skip(1).map(|i| i.parse().unwrap()).collect();
             _mark(&mut self.tasks, done, &parent_id, &ids, 0);
             return;
         }
@@ -217,38 +213,53 @@ impl TaskFile {
 
     pub fn move_task(&mut self, from: &str, to: &str) {
         // {{{
-        fn _get(tasks: &mut [Task], s_id: &[usize], depth: usize) -> Task {
+        fn _get(tasks: &mut [Task], p_id: &[usize], from: usize, depth: usize) -> Task {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
-                if id + 1 == s_id[depth] && s_id.len() == depth + 1 {
-                    return t.subtasks.remove(s_id[depth]);
-                } else if id + 1 == s_id[depth] {
-                    return _get(&mut t.subtasks, s_id, depth + 1);
+                if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
+                    return t.subtasks.remove(from - 1);
+                } else if id + 1 == p_id[depth] {
+                    return _get(&mut t.subtasks, p_id, from, depth + 1);
                 }
             }
-            panic!("This shouldn't happen. sub-task id: {s_id:?}; depth: {depth}");
+            panic!("This shouldn't happen. parent id: {p_id:?}; from: {from}; depth: {depth}");
+        }
+        // }}}
+
+        fn _put(tasks: &mut [Task], task: Task, p_id: &[usize], to: usize, depth: usize) {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
+                    t.subtasks.insert(to - 1, task);
+                    return;
+                } else if id + 1 == p_id[depth] {
+                    _put(&mut t.subtasks, task, p_id, to, depth + 1);
+                    return;
+                }
+            }
+            panic!("This shouldn't happen. parent id: {p_id:?}; to: {to}; depth: {depth}");
         }
         // }}}
         println!("Moving task...");
-        if from == to {
-            return;
-        }
 
         let task = if from.contains('.') {
-            let id: Vec<usize> = from
-                .split('.')
-                .map(|i| i.parse().expect("Verified to be usize"))
-                .collect();
-            _get(&mut self.tasks, &id, 0)
+            let t = from.rsplit_once('.').unwrap();
+            let parent_id: Vec<usize> = t.0.split('.').map(|i| i.parse().unwrap()).collect();
+            let from = t.1.parse().unwrap();
+            _get(&mut self.tasks, &parent_id, from, 0)
         } else {
-            let from = from.parse().expect("Verified to be usize");
-            self.tasks.remove(from)
+            let from: usize = from.parse().unwrap();
+            self.tasks.remove(from - 1)
         };
 
         if to.contains('.') {
+            let t = to.rsplit_once('.').unwrap();
+            let parent_id: Vec<usize> = t.0.split('.').map(|i| i.parse().unwrap()).collect();
+            let to = t.1.parse().unwrap();
+            _put(&mut self.tasks, task, &parent_id, to, 0)
         } else {
-            let to = to.parse().expect("Verified to be usize");
-            self.tasks.insert(to, task);
+            let to: usize = to.parse().unwrap();
+            self.tasks.insert(to - 1, task);
         }
     }
     // }}}
