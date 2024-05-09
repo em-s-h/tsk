@@ -22,22 +22,32 @@ fn main() {
     }
 
     // Operations {{{
+    let single_id = if cli.task_ids.len() > 2 {
+        format!("{}{}", cli.task_ids[0], cli.task_ids[1])
+    } else {
+        String::new()
+    };
+
     if cli.add_task {
-        task_file.add_task(&cli.task, &cli.add_to, "0")
+        task_file.add_task(&cli.task, &cli.add_to, &cli.task_ids[0])
+        //
     } else if cli.mark_done {
         task_file.mark_tasks(&cli.task_ids, true)
     } else if cli.unmark_done {
         task_file.mark_tasks(&cli.task_ids, false)
+        //
     } else if cli.move_task {
-        task_file.move_task(cli.task_ids[0], cli.new_id)
+        task_file.move_task(&single_id, &cli.new_id)
     } else if cli.swap_tasks {
-        task_file.swap_tasks(cli.task_ids[0], cli.new_id)
+        task_file.swap_tasks(&single_id, &cli.new_id)
+        //
     } else if cli.append_task {
-        task_file.append_to_task(cli.task_ids[0], &cli.task)
+        task_file.append_to_task(cli.task_ids[0].parse().unwrap(), &cli.task)
     } else if cli.edit_task {
-        task_file.edit_task(cli.task_ids[0], &cli.task)
+        task_file.edit_task(cli.task_ids[0].parse().unwrap(), &cli.task)
+        //
     } else if cli.delete_task {
-        task_file.delete_task(cli.task_ids[0])
+        task_file.delete_task(cli.task_ids[0].parse().unwrap())
     } else if cli.clear_dones {
         task_file.clear_dones()
     }

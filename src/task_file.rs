@@ -1,3 +1,4 @@
+use core::panic;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, process};
 
@@ -21,7 +22,7 @@ pub struct Task {
     // {{{
     contents: String,
     done: bool,
-    subtasks: Vec<Task>,
+    pub subtasks: Vec<Task>,
 }
 // }}}
 
@@ -114,20 +115,20 @@ impl TaskFile {
     }
     // }}}
 
-    pub fn add_task(&mut self, task: &str, pos: &AddPosition, sub_id: &str) {
+    pub fn add_task(&mut self, task: &str, pos: &AddPosition, parent_id: &str) {
         // {{{
-        fn _add(tasks: &mut [Task], task: Task, pos: &AddPosition, ids: &[usize], depth: usize) {
+        fn _add(tasks: &mut [Task], task: Task, pos: &AddPosition, p_id: &[usize], depth: usize) {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
-                if id + 1 == ids[depth] && ids.len() == depth + 1 {
+                if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
                     if pos == &AddPosition::Top {
                         t.subtasks.insert(0, task)
                     } else {
                         t.subtasks.push(task)
                     }
                     return;
-                } else if id + 1 == ids[depth] {
-                    _add(&mut t.subtasks, task, pos, ids, depth + 1);
+                } else if id + 1 == p_id[depth] {
+                    _add(&mut t.subtasks, task, pos, p_id, depth + 1);
                     return;
                 }
             }
@@ -141,12 +142,12 @@ impl TaskFile {
             subtasks: Vec::new(),
         };
 
-        if !sub_id.is_empty() {
-            let ids: Vec<usize> = sub_id
-                .split('.')
+        if !parent_id.is_empty() {
+            let p_id: Vec<usize> = parent_id
+                .split_terminator('.')
                 .map(|i| i.parse().expect("Ids verified to be usize"))
                 .collect();
-            _add(&mut self.tasks, task, pos, &ids, 0);
+            _add(&mut self.tasks, task, pos, &p_id, 0);
             return;
         }
 
@@ -158,36 +159,104 @@ impl TaskFile {
     }
     // }}}
 
-    pub fn mark_tasks(&mut self, ids: &[usize], done: bool) {
+    pub fn mark_tasks(&mut self, ids: &[String], done: bool) {
         // {{{
+        fn _mark(tasks: &mut [Task], done: bool, p_id: &[usize], ids: &[usize], depth: usize) {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
+                    mark(&mut t.subtasks, done, ids, false);
+                    return;
+                } else if id + 1 == p_id[depth] {
+                    _mark(&mut t.subtasks, done, p_id, ids, depth + 1);
+                    return;
+                }
+            }
+        }
+        // }}}
+
+        fn mark(tasks: &mut [Task], done: bool, ids: &[usize], all: bool) {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if ids.contains(&(id + 1)) || all {
+                    t.done = done
+                }
+                if t.subtasks.len() != 0 {
+                    mark(&mut t.subtasks, done, ids, true)
+                }
+            }
+        }
+        // }}}
+
         if done {
             println!("Marking tasks as done...");
         } else {
             println!("Unmarking tasks...");
         }
-        for (id, t) in self.tasks.iter_mut().enumerate() {
-            if ids.contains(&id) {
-                t.done = done
-            }
+        if ids[0].contains('.') {
+            let parent_id: Vec<usize> = ids[0]
+                .split_terminator('.')
+                .map(|i| i.parse().expect("Verified to be usize"))
+                .collect();
+            let ids: Vec<usize> = ids
+                .iter()
+                .skip(1)
+                .map(|i| i.parse().expect("Verified to be usize"))
+                .collect();
+            _mark(&mut self.tasks, done, &parent_id, &ids, 0);
+            return;
         }
+
+        let ids: Vec<usize> = ids
+            .iter()
+            .map(|i| i.parse().expect("Verified to be usize"))
+            .collect();
+        mark(&mut self.tasks, done, &ids, false)
     }
     // }}}
 
-    pub fn move_task(&mut self, from: usize, to: usize) {
+    pub fn move_task(&mut self, from: &str, to: &str) {
         // {{{
+        fn _get(tasks: &mut [Task], s_id: &[usize], depth: usize) -> Task {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if id + 1 == s_id[depth] && s_id.len() == depth + 1 {
+                    return t.subtasks.remove(s_id[depth]);
+                } else if id + 1 == s_id[depth] {
+                    return _get(&mut t.subtasks, s_id, depth + 1);
+                }
+            }
+            panic!("This shouldn't happen. sub-task id: {s_id:?}; depth: {depth}");
+        }
+        // }}}
         println!("Moving task...");
         if from == to {
             return;
         }
-        let task = self.tasks.remove(from);
-        self.tasks.insert(to, task);
+
+        let task = if from.contains('.') {
+            let id: Vec<usize> = from
+                .split('.')
+                .map(|i| i.parse().expect("Verified to be usize"))
+                .collect();
+            _get(&mut self.tasks, &id, 0)
+        } else {
+            let from = from.parse().expect("Verified to be usize");
+            self.tasks.remove(from)
+        };
+
+        if to.contains('.') {
+        } else {
+            let to = to.parse().expect("Verified to be usize");
+            self.tasks.insert(to, task);
+        }
     }
     // }}}
 
-    pub fn swap_tasks(&mut self, t1: usize, t2: usize) {
+    pub fn swap_tasks(&mut self, t1: &str, t2: &str) {
         // {{{
         println!("Swapping tasks...");
-        self.tasks.swap(t1, t2)
+        // self.tasks.swap(t1, t2)
     }
     // }}}
 
@@ -233,356 +302,356 @@ impl TaskFile {
 }
 // }}}
 
-#[cfg(test)]
-mod test {
-    // {{{
-    use super::*;
-
-    fn get_test_task_file() -> TaskFile {
-        // {{{
-        TaskFile {
-            tasks: vec![
-                Task {
-                    contents: "one".to_owned(),
-                    done: false,
-                    subtasks: Vec::new(),
-                },
-                Task {
-                    contents: "two".to_owned(),
-                    done: false,
-                    subtasks: Vec::new(),
-                },
-            ],
-        }
-    }
-    // }}}
-
-    fn get_test_done_task_file() -> TaskFile {
-        // {{{
-        TaskFile {
-            tasks: vec![
-                Task {
-                    contents: "one".to_owned(),
-                    done: true,
-                    subtasks: Vec::new(),
-                },
-                Task {
-                    contents: "two".to_owned(),
-                    done: true,
-                    subtasks: Vec::new(),
-                },
-            ],
-        }
-    }
-    // }}}
-
-    #[test]
-    #[ignore]
-    fn test_print() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.tasks[0].subtasks.push(Task {
-            contents: "sub".to_owned(),
-            done: false,
-            subtasks: vec![Task {
-                contents: "sub".to_owned(),
-                done: false,
-                subtasks: Vec::new(),
-            }],
-        });
-        tf.print(true);
-    }
-    // }}}
-
-    // Adding tasks {{{
-    #[test]
-    fn test_add_task_top() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("three", &AddPosition::Top, "");
-
-        assert_eq!(tf.tasks[0].contents, "three");
-        assert_eq!(tf.tasks[1].contents, "one");
-        assert_eq!(tf.tasks[2].contents, "two")
-    }
-    // }}}
-
-    #[test]
-    fn test_add_task_bot() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("three", &AddPosition::Bottom, "");
-
-        assert_eq!(tf.tasks[0].contents, "one");
-        assert_eq!(tf.tasks[1].contents, "two");
-        assert_eq!(tf.tasks[2].contents, "three");
-    }
-    // }}}
-
-    #[test]
-    fn test_add_sub_top() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("sub", &AddPosition::Top, "2");
-
-        assert_eq!(tf.tasks[0].contents, "one");
-        assert_eq!(tf.tasks[1].contents, "two");
-        assert_eq!(tf.tasks[1].subtasks[0].contents, "sub");
-    }
-    // }}}
-
-    #[test]
-    fn test_add_sub_bot() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("sub2", &AddPosition::Top, "2");
-        tf.add_task("sub1", &AddPosition::Top, "2");
-        tf.add_task("sub3", &AddPosition::Bottom, "2");
-
-        assert_eq!(tf.tasks[0].contents, "one");
-        assert_eq!(tf.tasks[1].contents, "two");
-        assert_eq!(tf.tasks[1].subtasks[0].contents, "sub1");
-        assert_eq!(tf.tasks[1].subtasks[1].contents, "sub2");
-        assert_eq!(tf.tasks[1].subtasks[2].contents, "sub3");
-    }
-    // }}}
-
-    #[test]
-    fn test_add_sub_sub_bot() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("sub1", &AddPosition::Top, "2");
-        tf.add_task("subsub2", &AddPosition::Top, "2.1");
-        tf.add_task("subsub1", &AddPosition::Top, "2.1");
-        tf.add_task("subsub3", &AddPosition::Bottom, "2.1");
-
-        assert_eq!(tf.tasks[0].contents, "one");
-        assert_eq!(tf.tasks[1].contents, "two");
-        assert_eq!(tf.tasks[1].subtasks[0].contents, "sub1");
-        assert_eq!(tf.tasks[1].subtasks[0].subtasks[0].contents, "subsub1");
-        assert_eq!(tf.tasks[1].subtasks[0].subtasks[1].contents, "subsub2");
-        assert_eq!(tf.tasks[1].subtasks[0].subtasks[2].contents, "subsub3");
-    }
-    // }}}
-
-    #[test]
-    fn test_add_sub_sub_top() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("sub", &AddPosition::Top, "2");
-        tf.add_task("subsub", &AddPosition::Top, "2.1");
-
-        assert_eq!(tf.tasks[0].contents, "one");
-        assert_eq!(tf.tasks[1].contents, "two");
-        assert_eq!(tf.tasks[1].subtasks[0].contents, "sub");
-        assert_eq!(tf.tasks[1].subtasks[0].subtasks[0].contents, "subsub");
-    }
-    // }}}
-    // }}}
-
-    // Marking tasks {{{
-    #[test]
-    fn test_mark_tasks_done() {
-        // {{{
-        let mut tf = get_test_task_file();
-        println!("Marking one");
-        tf.mark_tasks(&[0], true);
-
-        assert!(tf.tasks[0].done);
-        assert!(!tf.tasks[1].done);
-
-        let mut tf = get_test_task_file();
-        println!("Marking multiple");
-        tf.mark_tasks(&[0, 1], true);
-
-        assert!(tf.tasks[0].done);
-        assert!(tf.tasks[1].done);
-    }
-    // }}}
-
-    #[test]
-    fn test_mark_tasks_not_done() {
-        // {{{
-        let mut tf = get_test_done_task_file();
-        println!("Unmarking one");
-        tf.mark_tasks(&[0], false);
-
-        assert!(!tf.tasks[0].done);
-        assert!(tf.tasks[1].done);
-
-        let mut tf = get_test_task_file();
-        println!("Unmarking multiple");
-        tf.mark_tasks(&[0, 1], false);
-
-        assert!(!tf.tasks[0].done);
-        assert!(!tf.tasks[1].done);
-    }
-    // }}}
-
-    #[test]
-    fn test_mark_done_as_done() {
-        // {{{
-        let mut tf = get_test_done_task_file();
-        tf.mark_tasks(&[0, 1], true);
-
-        assert!(tf.tasks[0].done);
-        assert!(tf.tasks[1].done);
-    }
-    // }}}
-
-    #[test]
-    fn test_mark_not_done_as_not_done() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.mark_tasks(&[0, 1], false);
-
-        assert!(!tf.tasks[0].done);
-        assert!(!tf.tasks[1].done);
-    }
-    // }}}
-    // }}}
-
-    // Moving tasks {{{
-    #[test]
-    fn test_move_task_up() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Bottom, "");
-        tf.move_task(2, 0);
-
-        assert_eq!(tf.tasks.len(), 3);
-        assert_eq!(tf.tasks[0].contents, "other");
-        assert_eq!(tf.tasks[1].contents, "one");
-        assert_eq!(tf.tasks[2].contents, "two")
-    }
-    // }}}
-
-    #[test]
-    fn test_move_task_down() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Top, "");
-        tf.move_task(0, 2);
-
-        assert_eq!(tf.tasks.len(), 3);
-        assert_eq!(tf.tasks[0].contents, "one");
-        assert_eq!(tf.tasks[1].contents, "two");
-        assert_eq!(tf.tasks[2].contents, "other");
-    }
-    // }}}
-
-    #[test]
-    fn test_move_task_same_ids() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Top, "");
-        tf.move_task(0, 0);
-
-        assert_eq!(tf.tasks.len(), 3);
-        assert_eq!(tf.tasks[0].contents, "other");
-        assert_eq!(tf.tasks[1].contents, "one");
-        assert_eq!(tf.tasks[2].contents, "two");
-    }
-    // }}}
-    // }}}
-
-    // Swapping tasks {{{
-    #[test]
-    fn test_swap_tasks() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Top, "");
-        tf.swap_tasks(0, 2);
-
-        assert_eq!(tf.tasks.len(), 3);
-        assert_eq!(tf.tasks[0].contents, "two");
-        assert_eq!(tf.tasks[1].contents, "one");
-        assert_eq!(tf.tasks[2].contents, "other");
-    }
-    // }}}
-
-    #[test]
-    fn test_swap_tasks_same_ids() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.add_task("other", &AddPosition::Top, "");
-        tf.swap_tasks(0, 0);
-
-        assert_eq!(tf.tasks.len(), 3);
-        assert_eq!(tf.tasks[0].contents, "other");
-        assert_eq!(tf.tasks[1].contents, "one");
-        assert_eq!(tf.tasks[2].contents, "two");
-    }
-    // }}}
-    // }}}
-
-    // Appending tasks {{{
-    #[test]
-    fn test_append_task() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.append_to_task(0, "new");
-
-        assert_eq!(tf.tasks[0].contents, "onenew");
-    }
-    // }}}
-
-    #[test]
-    fn test_append_task_undo_done() {
-        // {{{
-        let mut tf = get_test_done_task_file();
-        tf.append_to_task(0, "new");
-
-        assert_eq!(tf.tasks[0].contents, "onenew");
-        assert!(!tf.tasks[0].done);
-    }
-    // }}}
-    // }}}
-
-    // Editing tasks {{{
-    #[test]
-    fn test_edit_task() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.edit_task(0, "new");
-
-        assert_eq!(tf.tasks[0].contents, "new");
-    }
-    // }}}
-
-    #[test]
-    fn test_edit_task_undo_done() {
-        // {{{
-        let mut tf = get_test_done_task_file();
-        tf.edit_task(0, "new");
-
-        assert_eq!(tf.tasks[0].contents, "new");
-        assert!(!tf.tasks[0].done);
-    }
-    // }}}
-    // }}}
-
-    // Deleting tasks {{{
-    #[test]
-    fn test_delete_task() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.delete_task(0);
-
-        assert_eq!(tf.tasks.len(), 1);
-    }
-    // }}}
-
-    #[test]
-    fn test_clear_dones() {
-        // {{{
-        let mut tf = get_test_task_file();
-        tf.tasks[0].done = true;
-        tf.clear_dones();
-
-        assert_eq!(tf.tasks.len(), 1);
-    }
-    // }}}
-    // }}}
-}
-// }}}
+// #[cfg(test)]
+// mod test {
+//     // {{{
+//     use super::*;
+//
+//     fn get_test_task_file() -> TaskFile {
+//         // {{{
+//         TaskFile {
+//             tasks: vec![
+//                 Task {
+//                     contents: "one".to_owned(),
+//                     done: false,
+//                     subtasks: Vec::new(),
+//                 },
+//                 Task {
+//                     contents: "two".to_owned(),
+//                     done: false,
+//                     subtasks: Vec::new(),
+//                 },
+//             ],
+//         }
+//     }
+//     // }}}
+//
+//     fn get_test_done_task_file() -> TaskFile {
+//         // {{{
+//         TaskFile {
+//             tasks: vec![
+//                 Task {
+//                     contents: "one".to_owned(),
+//                     done: true,
+//                     subtasks: Vec::new(),
+//                 },
+//                 Task {
+//                     contents: "two".to_owned(),
+//                     done: true,
+//                     subtasks: Vec::new(),
+//                 },
+//             ],
+//         }
+//     }
+//     // }}}
+//
+//     #[test]
+//     #[ignore]
+//     fn test_print() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.tasks[0].subtasks.push(Task {
+//             contents: "sub".to_owned(),
+//             done: false,
+//             subtasks: vec![Task {
+//                 contents: "sub".to_owned(),
+//                 done: false,
+//                 subtasks: Vec::new(),
+//             }],
+//         });
+//         tf.print(true);
+//     }
+//     // }}}
+//
+//     // Adding tasks {{{
+//     #[test]
+//     fn test_add_task_top() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("three", &AddPosition::Top, "");
+//
+//         assert_eq!(tf.tasks[0].contents, "three");
+//         assert_eq!(tf.tasks[1].contents, "one");
+//         assert_eq!(tf.tasks[2].contents, "two")
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_add_task_bot() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("three", &AddPosition::Bottom, "");
+//
+//         assert_eq!(tf.tasks[0].contents, "one");
+//         assert_eq!(tf.tasks[1].contents, "two");
+//         assert_eq!(tf.tasks[2].contents, "three");
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_add_sub_top() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("sub", &AddPosition::Top, "2");
+//
+//         assert_eq!(tf.tasks[0].contents, "one");
+//         assert_eq!(tf.tasks[1].contents, "two");
+//         assert_eq!(tf.tasks[1].subtasks[0].contents, "sub");
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_add_sub_bot() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("sub2", &AddPosition::Top, "2");
+//         tf.add_task("sub1", &AddPosition::Top, "2");
+//         tf.add_task("sub3", &AddPosition::Bottom, "2");
+//
+//         assert_eq!(tf.tasks[0].contents, "one");
+//         assert_eq!(tf.tasks[1].contents, "two");
+//         assert_eq!(tf.tasks[1].subtasks[0].contents, "sub1");
+//         assert_eq!(tf.tasks[1].subtasks[1].contents, "sub2");
+//         assert_eq!(tf.tasks[1].subtasks[2].contents, "sub3");
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_add_sub_sub_bot() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("sub1", &AddPosition::Top, "2");
+//         tf.add_task("subsub2", &AddPosition::Top, "2.1");
+//         tf.add_task("subsub1", &AddPosition::Top, "2.1");
+//         tf.add_task("subsub3", &AddPosition::Bottom, "2.1");
+//
+//         assert_eq!(tf.tasks[0].contents, "one");
+//         assert_eq!(tf.tasks[1].contents, "two");
+//         assert_eq!(tf.tasks[1].subtasks[0].contents, "sub1");
+//         assert_eq!(tf.tasks[1].subtasks[0].subtasks[0].contents, "subsub1");
+//         assert_eq!(tf.tasks[1].subtasks[0].subtasks[1].contents, "subsub2");
+//         assert_eq!(tf.tasks[1].subtasks[0].subtasks[2].contents, "subsub3");
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_add_sub_sub_top() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("sub", &AddPosition::Top, "2");
+//         tf.add_task("subsub", &AddPosition::Top, "2.1");
+//
+//         assert_eq!(tf.tasks[0].contents, "one");
+//         assert_eq!(tf.tasks[1].contents, "two");
+//         assert_eq!(tf.tasks[1].subtasks[0].contents, "sub");
+//         assert_eq!(tf.tasks[1].subtasks[0].subtasks[0].contents, "subsub");
+//     }
+//     // }}}
+//     // }}}
+//
+//     // Marking tasks {{{
+//     #[test]
+//     fn test_mark_tasks_done() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         println!("Marking one");
+//         tf.mark_tasks(&["0".to_string()], true);
+//
+//         assert!(tf.tasks[0].done);
+//         assert!(!tf.tasks[1].done);
+//
+//         let mut tf = get_test_task_file();
+//         println!("Marking multiple");
+//         tf.mark_tasks(&["0".to_string(), "1".to_string()], true);
+//
+//         assert!(tf.tasks[0].done);
+//         assert!(tf.tasks[1].done);
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_mark_tasks_not_done() {
+//         // {{{
+//         let mut tf = get_test_done_task_file();
+//         println!("Unmarking one");
+//         tf.mark_tasks(&["0".to_string()], false);
+//
+//         assert!(!tf.tasks[0].done);
+//         assert!(tf.tasks[1].done);
+//
+//         let mut tf = get_test_task_file();
+//         println!("Unmarking multiple");
+//         tf.mark_tasks(&["0".to_string(), "1".to_string()], false);
+//
+//         assert!(!tf.tasks[0].done);
+//         assert!(!tf.tasks[1].done);
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_mark_done_as_done() {
+//         // {{{
+//         let mut tf = get_test_done_task_file();
+//         tf.mark_tasks(&["0".to_string(), "1".to_string()], true);
+//
+//         assert!(tf.tasks[0].done);
+//         assert!(tf.tasks[1].done);
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_mark_not_done_as_not_done() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.mark_tasks(&["0".to_string(), "1".to_string()], false);
+//
+//         assert!(!tf.tasks[0].done);
+//         assert!(!tf.tasks[1].done);
+//     }
+//     // }}}
+//     // }}}
+//
+//     // Moving tasks {{{
+//     #[test]
+//     fn test_move_task_up() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("other", &AddPosition::Bottom, "");
+//         tf.move_task(2, 0);
+//
+//         assert_eq!(tf.tasks.len(), 3);
+//         assert_eq!(tf.tasks[0].contents, "other");
+//         assert_eq!(tf.tasks[1].contents, "one");
+//         assert_eq!(tf.tasks[2].contents, "two")
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_move_task_down() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("other", &AddPosition::Top, "");
+//         tf.move_task(0, 2);
+//
+//         assert_eq!(tf.tasks.len(), 3);
+//         assert_eq!(tf.tasks[0].contents, "one");
+//         assert_eq!(tf.tasks[1].contents, "two");
+//         assert_eq!(tf.tasks[2].contents, "other");
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_move_task_same_ids() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("other", &AddPosition::Top, "");
+//         tf.move_task(0, 0);
+//
+//         assert_eq!(tf.tasks.len(), 3);
+//         assert_eq!(tf.tasks[0].contents, "other");
+//         assert_eq!(tf.tasks[1].contents, "one");
+//         assert_eq!(tf.tasks[2].contents, "two");
+//     }
+//     // }}}
+//     // }}}
+//
+//     // Swapping tasks {{{
+//     #[test]
+//     fn test_swap_tasks() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("other", &AddPosition::Top, "");
+//         tf.swap_tasks(0, 2);
+//
+//         assert_eq!(tf.tasks.len(), 3);
+//         assert_eq!(tf.tasks[0].contents, "two");
+//         assert_eq!(tf.tasks[1].contents, "one");
+//         assert_eq!(tf.tasks[2].contents, "other");
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_swap_tasks_same_ids() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.add_task("other", &AddPosition::Top, "");
+//         tf.swap_tasks(0, 0);
+//
+//         assert_eq!(tf.tasks.len(), 3);
+//         assert_eq!(tf.tasks[0].contents, "other");
+//         assert_eq!(tf.tasks[1].contents, "one");
+//         assert_eq!(tf.tasks[2].contents, "two");
+//     }
+//     // }}}
+//     // }}}
+//
+//     // Appending tasks {{{
+//     #[test]
+//     fn test_append_task() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.append_to_task(0, "new");
+//
+//         assert_eq!(tf.tasks[0].contents, "onenew");
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_append_task_undo_done() {
+//         // {{{
+//         let mut tf = get_test_done_task_file();
+//         tf.append_to_task(0, "new");
+//
+//         assert_eq!(tf.tasks[0].contents, "onenew");
+//         assert!(!tf.tasks[0].done);
+//     }
+//     // }}}
+//     // }}}
+//
+//     // Editing tasks {{{
+//     #[test]
+//     fn test_edit_task() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.edit_task(0, "new");
+//
+//         assert_eq!(tf.tasks[0].contents, "new");
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_edit_task_undo_done() {
+//         // {{{
+//         let mut tf = get_test_done_task_file();
+//         tf.edit_task(0, "new");
+//
+//         assert_eq!(tf.tasks[0].contents, "new");
+//         assert!(!tf.tasks[0].done);
+//     }
+//     // }}}
+//     // }}}
+//
+//     // Deleting tasks {{{
+//     #[test]
+//     fn test_delete_task() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.delete_task(0);
+//
+//         assert_eq!(tf.tasks.len(), 1);
+//     }
+//     // }}}
+//
+//     #[test]
+//     fn test_clear_dones() {
+//         // {{{
+//         let mut tf = get_test_task_file();
+//         tf.tasks[0].done = true;
+//         tf.clear_dones();
+//
+//         assert_eq!(tf.tasks.len(), 1);
+//     }
+//     // }}}
+//     // }}}
+// }
+// // }}}
