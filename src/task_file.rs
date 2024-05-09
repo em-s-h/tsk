@@ -17,7 +17,7 @@ pub struct TaskFile {
 }
 // }}}
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Task {
     // {{{
     contents: String,
@@ -203,10 +203,7 @@ impl TaskFile {
             return;
         }
 
-        let ids: Vec<usize> = ids
-            .iter()
-            .map(|i| i.parse().expect("Verified to be usize"))
-            .collect();
+        let ids: Vec<usize> = ids.iter().map(|i| i.parse().unwrap()).collect();
         mark(&mut self.tasks, done, &ids, false)
     }
     // }}}
@@ -217,12 +214,12 @@ impl TaskFile {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
                 if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
-                    return t.subtasks.remove(from - 1);
+                    return t.subtasks.remove(from);
                 } else if id + 1 == p_id[depth] {
                     return _get(&mut t.subtasks, p_id, from, depth + 1);
                 }
             }
-            panic!("This shouldn't happen. parent id: {p_id:?}; from: {from}; depth: {depth}");
+            panic!("This should never happen");
         }
         // }}}
 
@@ -230,23 +227,23 @@ impl TaskFile {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
                 if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
-                    t.subtasks.insert(to - 1, task);
+                    t.subtasks.insert(to, task);
                     return;
                 } else if id + 1 == p_id[depth] {
                     _put(&mut t.subtasks, task, p_id, to, depth + 1);
                     return;
                 }
             }
-            panic!("This shouldn't happen. parent id: {p_id:?}; to: {to}; depth: {depth}");
         }
         // }}}
+
         println!("Moving task...");
 
         let task = if from.contains('.') {
             let t = from.rsplit_once('.').unwrap();
             let parent_id: Vec<usize> = t.0.split('.').map(|i| i.parse().unwrap()).collect();
-            let from = t.1.parse().unwrap();
-            _get(&mut self.tasks, &parent_id, from, 0)
+            let from: usize = t.1.parse().unwrap();
+            _get(&mut self.tasks, &parent_id, from - 1, 0)
         } else {
             let from: usize = from.parse().unwrap();
             self.tasks.remove(from - 1)
@@ -255,8 +252,8 @@ impl TaskFile {
         if to.contains('.') {
             let t = to.rsplit_once('.').unwrap();
             let parent_id: Vec<usize> = t.0.split('.').map(|i| i.parse().unwrap()).collect();
-            let to = t.1.parse().unwrap();
-            _put(&mut self.tasks, task, &parent_id, to, 0)
+            let to: usize = t.1.parse().unwrap();
+            _put(&mut self.tasks, task, &parent_id, to - 1, 0)
         } else {
             let to: usize = to.parse().unwrap();
             self.tasks.insert(to - 1, task);
@@ -266,8 +263,60 @@ impl TaskFile {
 
     pub fn swap_tasks(&mut self, t1: &str, t2: &str) {
         // {{{
+        fn _get(tasks: &[Task], s_id: &[usize], depth: usize) -> Task {
+            // {{{
+            for (id, t) in tasks.iter().enumerate() {
+                if id + 1 == s_id[depth] && s_id.len() - 1 == depth {
+                    return t.clone();
+                } else if id + 1 == s_id[depth] {
+                    return _get(&t.subtasks, s_id, depth + 1);
+                }
+            }
+            panic!("This shouldn't happen")
+        }
+        // }}}
+
+        fn _swap(tasks: &mut [Task], task: Task, s_id: &[usize], depth: usize) {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if id + 1 == s_id[depth] && s_id.len() - 1 == depth {
+                    *t = task;
+                    return;
+                } else if id + 1 == s_id[depth] {
+                    _swap(&mut t.subtasks, task, s_id, depth + 1);
+                    return;
+                }
+            }
+            panic!("This shouldn't happen")
+        }
+        // }}}
+
         println!("Swapping tasks...");
-        // self.tasks.swap(t1, t2)
+
+        if !t1.contains('.') && !t2.contains('.') {
+            let t1: usize = t1.parse().unwrap();
+            let t2: usize = t2.parse().unwrap();
+            self.tasks.swap(t1 - 1, t2 - 1);
+            return;
+        }
+
+        let (t1, id1) = if t1.contains('.') {
+            let s_id: Vec<usize> = t1.split('.').map(|i| i.parse().unwrap()).collect();
+            (_get(&self.tasks, &s_id, 0), s_id)
+        } else {
+            let id: usize = t1.parse().unwrap();
+            (self.tasks[id - 1].clone(), vec![id])
+        };
+
+        let (t2, id2) = if t2.contains('.') {
+            let s_id: Vec<usize> = t2.split('.').map(|i| i.parse().unwrap()).collect();
+            (_get(&self.tasks, &s_id, 0), s_id)
+        } else {
+            let id: usize = t2.parse().unwrap();
+            (self.tasks[id - 1].clone(), vec![id])
+        };
+        _swap(&mut self.tasks, t2, &id1, 0);
+        _swap(&mut self.tasks, t1, &id2, 0)
     }
     // }}}
 
