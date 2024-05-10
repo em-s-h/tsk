@@ -192,13 +192,16 @@ impl Cli {
 
             if arg == "-all" {
                 return (1..=get_task_count()).map(|i| i.to_string()).collect();
+            } else if arg.is_empty() || arg == "0" {
+                eprintln!("Invalid id: '{arg}'");
+                process::exit(1);
             } else if arg.starts_with('-') {
                 eprintln!("Invalid sub-option: '{arg}'");
                 process::exit(1);
             }
 
             if !arg.contains(|c: char| c.is_ascii_digit() || c == '.' || c == ',') {
-                eprintln!("Invalid subtask id: '{arg}'");
+                eprintln!("Invalid id: '{arg}'");
                 process::exit(1);
             }
 
@@ -458,62 +461,5 @@ Sub-Options:
 #[cfg(test)]
 mod test {
     // {{{
-    use super::*;
-
-    #[test]
-    #[ignore]
-    fn test_test() {
-        let arg = "1..2".to_owned();
-        let prep = |pat: &str| -> (Vec<String>, (String, String)) {
-            // {{{
-            // "1.2.3,5,..." -> "1.2.3", "5" "..."
-            let v: Vec<String> = arg.split(pat).map(|s| s.to_owned()).collect();
-            // "1.2.3" -> "1.2", "3"
-            let t = {
-                if let Some(t) = v[0].rsplit_once('.') {
-                    t
-                } else {
-                    (v[0].as_str(), "0")
-                }
-            };
-
-            let t = (t.0.to_owned(), t.1.to_owned());
-
-            let f: f32 = t.0.parse().unwrap_or_else(|_| {
-                eprintln!("Invalid subtask id: {arg}");
-                process::exit(1)
-            });
-            if f < 1.0 {
-                eprintln!("Invalid subtask id: {arg}");
-                process::exit(1)
-            }
-            let _: usize = t.1.parse().unwrap_or_else(|_| {
-                eprintln!("Invalid subtask id: '{arg}'");
-                process::exit(1)
-            });
-            (v, t)
-        };
-        // }}}
-
-        let (v, t) = prep("..");
-        if v.len() != 2 || v[1].contains('.') {
-            eprintln!("Invalid subtask id: '{arg}'");
-            process::exit(1)
-        }
-
-        let from: usize = t.1.parse().expect("Already verified to be usize");
-        let from = if from == 0 { 1 } else { from };
-
-        let to: usize = v[1].parse().unwrap_or_else(|_| {
-            eprintln!("Invalid subtask id: '{arg}'");
-            process::exit(1)
-        });
-        let mut ret: Vec<String> = Vec::new();
-
-        for i in from..=to {
-            ret.push(format!("{}.{i}", t.0))
-        }
-        println!("{ret:?}")
-    }
 }
 // }}}
