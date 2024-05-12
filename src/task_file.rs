@@ -1,4 +1,3 @@
-use core::panic;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, process};
 
@@ -166,9 +165,13 @@ impl TaskFile {
             for (id, t) in tasks.iter_mut().enumerate() {
                 if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
                     mark(&mut t.subtasks, done, ids, false);
+                    let all_done = t.subtasks.iter().find(|t| !t.done).is_none();
+                    t.done = all_done;
                     return;
                 } else if id + 1 == p_id[depth] {
                     _mark(&mut t.subtasks, done, p_id, ids, depth + 1);
+                    let all_done = t.subtasks.iter().find(|t| !t.done).is_none();
+                    t.done = all_done;
                     return;
                 }
             }
@@ -179,10 +182,10 @@ impl TaskFile {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
                 if ids.contains(&(id + 1)) || all {
-                    t.done = done
-                }
-                if t.subtasks.len() != 0 {
-                    mark(&mut t.subtasks, done, ids, true)
+                    t.done = done;
+                    if t.subtasks.len() != 0 {
+                        mark(&mut t.subtasks, done, ids, true)
+                    }
                 }
             }
         }
@@ -198,8 +201,8 @@ impl TaskFile {
                 .split_terminator('.')
                 .map(|i| i.parse().unwrap())
                 .collect();
-            let ids: Vec<usize> = ids.iter().skip(1).map(|i| i.parse().unwrap()).collect();
-            _mark(&mut self.tasks, done, &parent_id, &ids, 0);
+            let s_ids: Vec<usize> = ids.iter().skip(1).map(|i| i.parse().unwrap()).collect();
+            _mark(&mut self.tasks, done, &parent_id, &s_ids, 0);
             return;
         }
 
@@ -210,54 +213,104 @@ impl TaskFile {
 
     pub fn move_task(&mut self, from: &str, to: &str) {
         // {{{
-        fn _get(tasks: &mut [Task], p_id: &[usize], from: usize, depth: usize) -> Task {
+        fn _get(tasks: &mut [Task], s_id: &[usize], depth: usize) -> Task {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
-                if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
-                    return t.subtasks.remove(from);
-                } else if id + 1 == p_id[depth] {
-                    return _get(&mut t.subtasks, p_id, from, depth + 1);
+                if id + 1 == s_id[depth] && s_id.len() - 1 == depth + 1 {
+                    return t.subtasks.get(s_id[depth + 1]).unwrap().clone();
+                } else if id + 1 == s_id[depth] {
+                    return _get(&mut t.subtasks, s_id, depth + 1);
                 }
             }
             panic!("This should never happen");
         }
         // }}}
 
-        fn _put(tasks: &mut [Task], task: Task, p_id: &[usize], to: usize, depth: usize) {
+        fn _put(tasks: &mut [Task], task: Task, s_id: &[usize], depth: usize) {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
-                if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
-                    t.subtasks.insert(to, task);
+                if id + 1 == s_id[depth] && s_id.len() - 1 == depth + 1 {
+                    t.subtasks.insert(s_id[depth + 1], task);
                     return;
-                } else if id + 1 == p_id[depth] {
-                    _put(&mut t.subtasks, task, p_id, to, depth + 1);
+                } else if id + 1 == s_id[depth] {
+                    _put(&mut t.subtasks, task, s_id, depth + 1);
                     return;
                 }
             }
         }
         // }}}
 
+        fn _remove(tasks: &mut [Task], s_id: &[usize], depth: usize) {
+            // {{{
+            for (id, t) in tasks.iter_mut().enumerate() {
+                if id + 1 == s_id[depth] && s_id.len() - 1 == depth + 1 {
+                    t.subtasks.remove(s_id[depth + 1]);
+                    return;
+                } else if id + 1 == s_id[depth] {
+                    _remove(&mut t.subtasks, s_id, depth + 1);
+                    return;
+                }
+            }
+            panic!("This should never happen");
+        }
+        // }}}
+
         println!("Moving task...");
+        let (from_id, from_sub_id, to_id, to_sub_id) = {
+            // Initializing important variables {{{
+            let (fid, fsid) = if from.contains('.') {
+                let mut sub_id: Vec<usize> = from.split('.').map(|i| i.parse().unwrap()).collect();
+                let last = sub_id.len() - 1;
+                sub_id[last] -= 1;
+                (0, sub_id)
+            } else {
+                let from: usize = from.parse().unwrap();
+                (from - 1, Vec::new())
+            };
+
+            let (tid, tsid) = if to.contains('.') {
+                let mut sub_id: Vec<usize> = to.split('.').map(|i| i.parse().unwrap()).collect();
+                let last = sub_id.len() - 1;
+                sub_id[last] -= 1;
+                (0, sub_id)
+            } else {
+                let to: usize = to.parse().unwrap();
+                (to - 1, Vec::new())
+            };
+
+            (fid, fsid, tid, tsid)
+        };
+        // }}}
 
         let task = if from.contains('.') {
-            let t = from.rsplit_once('.').unwrap();
-            let parent_id: Vec<usize> = t.0.split('.').map(|i| i.parse().unwrap()).collect();
-            let from: usize = t.1.parse().unwrap();
-            _get(&mut self.tasks, &parent_id, from - 1, 0)
+            _get(&mut self.tasks, &from_sub_id, 0)
         } else {
-            let from: usize = from.parse().unwrap();
-            self.tasks.remove(from - 1)
+            self.tasks.get(from_id).unwrap().clone()
         };
 
         if to.contains('.') {
-            let t = to.rsplit_once('.').unwrap();
-            let parent_id: Vec<usize> = t.0.split('.').map(|i| i.parse().unwrap()).collect();
-            let to: usize = t.1.parse().unwrap();
-            _put(&mut self.tasks, task, &parent_id, to - 1, 0)
+            if from.contains('.')
+                && from_sub_id[..from_sub_id.len() - 2] == to_sub_id[..to_sub_id.len() - 2]
+            {
+                _remove(&mut self.tasks, &from_sub_id, 0);
+                _put(&mut self.tasks, task, &to_sub_id, 0);
+                return;
+            }
+            _put(&mut self.tasks, task, &to_sub_id, 0);
         } else {
-            let to: usize = to.parse().unwrap();
-            self.tasks.insert(to - 1, task);
+            if !from.contains('.') {
+                self.tasks.remove(from_id);
+                self.tasks.insert(to_id, task);
+                return;
+            }
+            self.tasks.insert(to_id, task);
         }
+
+        if !from.contains('.') {
+            self.tasks.remove(from_id);
+            return;
+        }
+        _remove(&mut self.tasks, &from_sub_id, 0)
     }
     // }}}
 
@@ -475,7 +528,18 @@ mod test {
                 Task {
                     contents: "two".to_owned(),
                     done: false,
-                    subtasks: Vec::new(),
+                    subtasks: vec![
+                        Task {
+                            contents: "one".to_owned(),
+                            done: false,
+                            subtasks: Vec::new(),
+                        },
+                        Task {
+                            contents: "two".to_owned(),
+                            done: false,
+                            subtasks: Vec::new(),
+                        },
+                    ],
                 },
             ],
         }
@@ -505,7 +569,18 @@ mod test {
                 Task {
                     contents: "two".to_owned(),
                     done: true,
-                    subtasks: Vec::new(),
+                    subtasks: vec![
+                        Task {
+                            contents: "one".to_owned(),
+                            done: true,
+                            subtasks: Vec::new(),
+                        },
+                        Task {
+                            contents: "two".to_owned(),
+                            done: true,
+                            subtasks: Vec::new(),
+                        },
+                    ],
                 },
             ],
         }
@@ -667,15 +742,16 @@ mod test {
         tf = get_test_task_file();
         tf.mark_tasks(&["1.".to_owned(), "1".to_owned(), "2".to_owned()], true);
 
-        assert!(!tf.tasks[0].done);
+        assert!(tf.tasks[0].done);
         assert!(tf.tasks[0].subtasks[0].done);
         assert!(tf.tasks[0].subtasks[1].done);
         assert!(!tf.tasks[1].done);
 
         tf = get_test_done_task_file();
         tf.mark_tasks(&["1.".to_owned(), "1".to_owned()], false);
+        tf.print(true);
 
-        assert!(tf.tasks[0].done);
+        assert!(!tf.tasks[0].done);
         assert!(!tf.tasks[0].subtasks[0].done);
         assert!(tf.tasks[0].subtasks[1].done);
         assert!(tf.tasks[1].done);
@@ -683,7 +759,7 @@ mod test {
         tf = get_test_done_task_file();
         tf.mark_tasks(&["1.".to_owned(), "1".to_owned(), "2".to_owned()], false);
 
-        assert!(tf.tasks[0].done);
+        assert!(!tf.tasks[0].done);
         assert!(!tf.tasks[0].subtasks[0].done);
         assert!(!tf.tasks[0].subtasks[1].done);
         assert!(tf.tasks[1].done);
@@ -694,22 +770,26 @@ mod test {
     fn test_mark_parent_mark_child() {
         // {{{
         let mut tf = get_test_task_file();
-        tf.add_task("subsub", &AddPosition::Top, "1.1");
-        tf.mark_tasks(&["1".to_owned()], true);
-
-        assert!(tf.tasks[0].done);
-        assert!(tf.tasks[0].subtasks[0].done);
-        assert!(tf.tasks[0].subtasks[0].subtasks[0].done);
-        assert!(tf.tasks[0].subtasks[1].done);
-        assert!(!tf.tasks[1].done);
-
-        tf = get_test_done_task_file();
-        tf.mark_tasks(&["1".to_owned()], false);
+        tf.add_task("subsub", &AddPosition::Top, "2.1");
+        tf.mark_tasks(&["2".to_owned()], true);
 
         assert!(!tf.tasks[0].done);
         assert!(!tf.tasks[0].subtasks[0].done);
         assert!(!tf.tasks[0].subtasks[1].done);
         assert!(tf.tasks[1].done);
+        assert!(tf.tasks[1].subtasks[0].done);
+        assert!(tf.tasks[1].subtasks[0].subtasks[0].done);
+        assert!(tf.tasks[1].subtasks[1].done);
+
+        tf = get_test_done_task_file();
+        tf.mark_tasks(&["2".to_owned()], false);
+
+        assert!(tf.tasks[0].done);
+        assert!(tf.tasks[0].subtasks[0].done);
+        assert!(tf.tasks[0].subtasks[1].done);
+        assert!(!tf.tasks[1].done);
+        assert!(!tf.tasks[1].subtasks[0].done);
+        assert!(!tf.tasks[1].subtasks[1].done);
     }
     // }}}
 
@@ -731,79 +811,116 @@ mod test {
     // }}}
     // }}}
 
-    // // Moving tasks {{{
-    // #[test]
-    // fn test_move_task_up() {
-    //     // {{{
-    //     let mut tf = get_test_task_file();
-    //     tf.add_task("other", &AddPosition::Bottom, "");
-    //     tf.move_task(2, 0);
-    //
-    //     assert_eq!(tf.tasks.len(), 3);
-    //     assert_eq!(tf.tasks[0].contents, "other");
-    //     assert_eq!(tf.tasks[1].contents, "one");
-    //     assert_eq!(tf.tasks[2].contents, "two")
-    // }
-    // // }}}
-    //
-    // #[test]
-    // fn test_move_task_down() {
-    //     // {{{
-    //     let mut tf = get_test_task_file();
-    //     tf.add_task("other", &AddPosition::Top, "");
-    //     tf.move_task(0, 2);
-    //
-    //     assert_eq!(tf.tasks.len(), 3);
-    //     assert_eq!(tf.tasks[0].contents, "one");
-    //     assert_eq!(tf.tasks[1].contents, "two");
-    //     assert_eq!(tf.tasks[2].contents, "other");
-    // }
-    // // }}}
-    //
-    // #[test]
-    // fn test_move_task_same_ids() {
-    //     // {{{
-    //     let mut tf = get_test_task_file();
-    //     tf.add_task("other", &AddPosition::Top, "");
-    //     tf.move_task(0, 0);
-    //
-    //     assert_eq!(tf.tasks.len(), 3);
-    //     assert_eq!(tf.tasks[0].contents, "other");
-    //     assert_eq!(tf.tasks[1].contents, "one");
-    //     assert_eq!(tf.tasks[2].contents, "two");
-    // }
-    // // }}}
-    // // }}}
+    // Moving tasks {{{
+    #[test]
+    fn test_move_task() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.add_task("other", &AddPosition::Bottom, "");
+        tf.move_task("3", "1");
 
-    // // Swapping tasks {{{
-    // #[test]
-    // fn test_swap_tasks() {
-    //     // {{{
-    //     let mut tf = get_test_task_file();
-    //     tf.add_task("other", &AddPosition::Top, "");
-    //     tf.swap_tasks(0, 2);
-    //
-    //     assert_eq!(tf.tasks.len(), 3);
-    //     assert_eq!(tf.tasks[0].contents, "two");
-    //     assert_eq!(tf.tasks[1].contents, "one");
-    //     assert_eq!(tf.tasks[2].contents, "other");
-    // }
-    // // }}}
-    //
-    // #[test]
-    // fn test_swap_tasks_same_ids() {
-    //     // {{{
-    //     let mut tf = get_test_task_file();
-    //     tf.add_task("other", &AddPosition::Top, "");
-    //     tf.swap_tasks(0, 0);
-    //
-    //     assert_eq!(tf.tasks.len(), 3);
-    //     assert_eq!(tf.tasks[0].contents, "other");
-    //     assert_eq!(tf.tasks[1].contents, "one");
-    //     assert_eq!(tf.tasks[2].contents, "two");
-    // }
-    // // }}}
-    // // }}}
+        assert_eq!(tf.tasks[0].contents, "other");
+        assert_eq!(tf.tasks[1].contents, "one");
+        assert_eq!(tf.tasks[2].contents, "two");
+
+        tf.move_task("1", "3");
+
+        assert_eq!(tf.tasks[0].contents, "one");
+        assert_eq!(tf.tasks[1].contents, "two");
+        assert_eq!(tf.tasks[2].contents, "other");
+
+        assert_eq!(tf.tasks[0].subtasks.len(), 2);
+        assert_eq!(tf.tasks[1].subtasks.len(), 2);
+    }
+    // }}}
+
+    #[test]
+    fn test_move_subtask() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.add_task("other", &AddPosition::Top, "1");
+        tf.move_task("1.1", "1.3");
+
+        assert_eq!(tf.tasks[0].contents, "one");
+        assert_eq!(tf.tasks[0].subtasks[0].contents, "one");
+        assert_eq!(tf.tasks[0].subtasks[1].contents, "two");
+        assert_eq!(tf.tasks[0].subtasks[2].contents, "other");
+        assert_eq!(tf.tasks[1].contents, "two");
+
+        tf.move_task("1.3", "1.1");
+
+        assert_eq!(tf.tasks[0].contents, "one");
+        assert_eq!(tf.tasks[0].subtasks[0].contents, "other");
+        assert_eq!(tf.tasks[0].subtasks[1].contents, "one");
+        assert_eq!(tf.tasks[0].subtasks[2].contents, "two");
+        assert_eq!(tf.tasks[1].contents, "two");
+    }
+    // }}}
+
+    #[test]
+    fn test_move_between_task_and_subtask() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.move_task("1.1", "3");
+
+        assert_eq!(tf.tasks[0].contents, "one");
+        assert_eq!(tf.tasks[0].subtasks[0].contents, "two");
+        assert_eq!(tf.tasks[1].contents, "two");
+        assert_eq!(tf.tasks[1].subtasks[0].contents, "one");
+        assert_eq!(tf.tasks[1].subtasks[1].contents, "two");
+        assert_eq!(tf.tasks[2].contents, "one");
+
+        tf.move_task("1", "3.1");
+        tf.print(true);
+
+        assert_eq!(tf.tasks[0].contents, "two");
+        assert_eq!(tf.tasks[0].subtasks[0].contents, "one");
+        assert_eq!(tf.tasks[0].subtasks[1].contents, "two");
+        assert_eq!(tf.tasks[1].contents, "one");
+        assert_eq!(tf.tasks[1].subtasks[0].contents, "one");
+        assert_eq!(tf.tasks[1].subtasks[0].subtasks[0].contents, "two");
+    }
+    // }}}
+    // }}}
+
+    // Swapping tasks {{{
+    #[test]
+    fn test_swap_tasks() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.add_task("other", &AddPosition::Top, "");
+        tf.swap_tasks("1", "3");
+
+        assert_eq!(tf.tasks[0].contents, "two");
+        assert_eq!(tf.tasks[1].contents, "one");
+        assert_eq!(tf.tasks[2].contents, "other");
+
+        assert_eq!(tf.tasks[0].subtasks.len(), 2);
+        assert_eq!(tf.tasks[1].subtasks.len(), 2);
+    }
+    // }}}
+
+    #[test]
+    fn test_swap_task_subtask() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.swap_tasks("1.2", "2");
+
+        assert_eq!(tf.tasks[0].contents, "one");
+        assert_eq!(tf.tasks[1].contents, "two");
+
+        assert_eq!(tf.tasks[0].subtasks.len(), 2);
+        assert_eq!(tf.tasks[0].subtasks[1].subtasks.len(), 2);
+        assert_eq!(tf.tasks[1].subtasks.len(), 0);
+
+        tf.swap_tasks("2", "1.2");
+
+        assert_eq!(tf.tasks[0].subtasks.len(), 2);
+        assert_eq!(tf.tasks[0].subtasks[1].subtasks.len(), 0);
+        assert_eq!(tf.tasks[1].subtasks.len(), 2);
+    }
+    // }}}
+    // }}}
 
     // // Appending tasks {{{
     // #[test]

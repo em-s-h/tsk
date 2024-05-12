@@ -381,6 +381,18 @@ impl Cli {
 
         if self.move_task || self.swap_tasks {
             let v = get_task_ids(&mut args);
+
+            let p_id1: usize = v[0].split('.').next().unwrap().parse().unwrap();
+            let p_id2: usize = self.task_ids[0].split('.').next().unwrap().parse().unwrap();
+
+            let task_and_sub = (v[0].contains('.') && !self.task_ids[0].contains('.'))
+                || (!v[0].contains('.') && self.task_ids[0].contains('.'));
+
+            if p_id1 == p_id2 && task_and_sub {
+                eprintln!("Cannot operate on both a task and its subtasks");
+                process::exit(1);
+            }
+
             self.new_id = if v[0].contains('.') {
                 format!("{}{}", v[0], v[1])
             } else {
