@@ -70,17 +70,16 @@ impl TaskFile {
 
     pub fn print(&self, colored: bool) {
         // {{{
-        fn _print(tasks: &[Task], colored: bool, parent_id: &str) {
+        fn _print(tasks: &[Task], colored: bool, t_id: &str, depth: usize) {
             // {{{
-            let depth = parent_id.split('.').count() - 1;
-            let parent_id = parent_id.trim();
+            let t_id = t_id.trim();
 
             for (id, t) in tasks.iter().enumerate() {
                 let mut id = {
                     if depth == 0 {
                         format!("{:>2}", id + 1)
                     } else {
-                        format!("{parent_id}{}", id + 1)
+                        format!("{t_id}{}", id + 1)
                     }
                 };
                 for _i in 0..depth {
@@ -97,8 +96,8 @@ impl TaskFile {
                     println!("{id}. [ ] {}", t.contents);
                 }
 
-                if t.subtasks.len() > 0 {
-                    _print(&t.subtasks, colored, format!("{id}.").as_str())
+                if t.subtasks.len() != 0 {
+                    _print(&t.subtasks, colored, format!("{id}.").as_str(), depth)
                 }
             }
         }
@@ -110,7 +109,7 @@ impl TaskFile {
         }
         println!("Tasks:\n");
 
-        _print(&self.tasks, colored, "")
+        _print(&self.tasks, colored, "", 0)
     }
     // }}}
 
@@ -259,7 +258,7 @@ impl TaskFile {
         let (from_id, from_sub_id, to_id, to_sub_id) = {
             // Initializing important variables {{{
             let (fid, fsid) = if from.contains('.') {
-                let mut sub_id: Vec<usize> = from.split('.').map(|i| i.parse().unwrap()).collect();
+                let mut sub_id = Self::get_subtask_id(from);
                 let last = sub_id.len() - 1;
                 sub_id[last] -= 1;
                 (0, sub_id)
@@ -269,7 +268,7 @@ impl TaskFile {
             };
 
             let (tid, tsid) = if to.contains('.') {
-                let mut sub_id: Vec<usize> = to.split('.').map(|i| i.parse().unwrap()).collect();
+                let mut sub_id = Self::get_subtask_id(to);
                 let last = sub_id.len() - 1;
                 sub_id[last] -= 1;
                 (0, sub_id)
@@ -354,7 +353,7 @@ impl TaskFile {
         }
 
         let (t1, id1) = if t1.contains('.') {
-            let s_id: Vec<usize> = t1.split('.').map(|i| i.parse().unwrap()).collect();
+            let s_id = Self::get_subtask_id(t1);
             (_get(&self.tasks, &s_id, 0), s_id)
         } else {
             let id: usize = t1.parse().unwrap();
@@ -362,7 +361,7 @@ impl TaskFile {
         };
 
         let (t2, id2) = if t2.contains('.') {
-            let s_id: Vec<usize> = t2.split('.').map(|i| i.parse().unwrap()).collect();
+            let s_id = Self::get_subtask_id(t2);
             (_get(&self.tasks, &s_id, 0), s_id)
         } else {
             let id: usize = t2.parse().unwrap();
@@ -384,6 +383,7 @@ impl TaskFile {
                     return;
                 } else if id + 1 == s_id[depth] {
                     _append(&mut t.subtasks, content, s_id, depth + 1);
+                    t.done = false;
                     return;
                 }
             }
@@ -399,7 +399,7 @@ impl TaskFile {
             return;
         }
 
-        let s_id: Vec<usize> = id.split('.').map(|i| i.parse().unwrap()).collect();
+        let s_id = Self::get_subtask_id(id);
         _append(&mut self.tasks, &content, &s_id, 0)
     }
     // }}}
@@ -415,6 +415,7 @@ impl TaskFile {
                     return;
                 } else if id + 1 == s_id[depth] {
                     _edit(&mut t.subtasks, new_content, s_id, depth + 1);
+                    t.done = false;
                     return;
                 }
             }
@@ -429,7 +430,7 @@ impl TaskFile {
             return;
         }
 
-        let s_id: Vec<usize> = id.split('.').map(|i| i.parse().unwrap()).collect();
+        let s_id = Self::get_subtask_id(id);
         _edit(&mut self.tasks, new_content, &s_id, 0)
     }
     // }}}
@@ -466,15 +467,17 @@ impl TaskFile {
         fn _clear(tasks: &mut [Task]) {
             // {{{
             for t in tasks.iter_mut() {
-                t.subtasks = t
-                    .subtasks
-                    .iter()
-                    .filter(|t| !t.done)
-                    .map(|t| t.to_owned())
-                    .collect();
-
                 if t.subtasks.len() != 0 {
-                    _clear(&mut t.subtasks)
+                    t.subtasks = t
+                        .subtasks
+                        .iter()
+                        .filter(|t| !t.done)
+                        .map(|t| t.to_owned())
+                        .collect();
+
+                    if t.subtasks.len() != 0 {
+                        _clear(&mut t.subtasks)
+                    }
                 }
             }
         }
@@ -922,73 +925,91 @@ mod test {
     // }}}
     // }}}
 
-    // // Appending tasks {{{
-    // #[test]
-    // fn test_append_task() {
-    //     // {{{
-    //     let mut tf = get_test_task_file();
-    //     tf.append_to_task(0, "new");
-    //
-    //     assert_eq!(tf.tasks[0].contents, "onenew");
-    // }
-    // // }}}
-    //
-    // #[test]
-    // fn test_append_task_undo_done() {
-    //     // {{{
-    //     let mut tf = get_test_done_task_file();
-    //     tf.append_to_task(0, "new");
-    //
-    //     assert_eq!(tf.tasks[0].contents, "onenew");
-    //     assert!(!tf.tasks[0].done);
-    // }
-    // // }}}
-    // // }}}
+    // Appending tasks {{{
+    #[test]
+    fn test_append_task() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.append_to_task("1", "new");
+        tf.append_to_task("1.1", "new");
 
-    // // Editing tasks {{{
-    // #[test]
-    // fn test_edit_task() {
-    //     // {{{
-    //     let mut tf = get_test_task_file();
-    //     tf.edit_task(0, "new");
-    //
-    //     assert_eq!(tf.tasks[0].contents, "new");
-    // }
-    // // }}}
-    //
-    // #[test]
-    // fn test_edit_task_undo_done() {
-    //     // {{{
-    //     let mut tf = get_test_done_task_file();
-    //     tf.edit_task(0, "new");
-    //
-    //     assert_eq!(tf.tasks[0].contents, "new");
-    //     assert!(!tf.tasks[0].done);
-    // }
-    // // }}}
-    // // }}}
+        assert_eq!(tf.tasks[0].contents, "one new");
+        assert_eq!(tf.tasks[0].subtasks[0].contents, "one new");
+    }
+    // }}}
 
-    // // Deleting tasks {{{
-    // #[test]
-    // fn test_delete_task() {
-    //     // {{{
-    //     let mut tf = get_test_task_file();
-    //     tf.delete_task(0);
-    //
-    //     assert_eq!(tf.tasks.len(), 1);
-    // }
-    // // }}}
-    //
-    // #[test]
-    // fn test_clear_dones() {
-    //     // {{{
-    //     let mut tf = get_test_task_file();
-    //     tf.tasks[0].done = true;
-    //     tf.clear_dones();
-    //
-    //     assert_eq!(tf.tasks.len(), 1);
-    // }
-    // // }}}
-    // // }}}
+    #[test]
+    fn test_append_task_undo_done() {
+        // {{{
+        let mut tf = get_test_done_task_file();
+        tf.append_to_task("1", "new");
+
+        assert!(!tf.tasks[0].done);
+
+        tf = get_test_done_task_file();
+        tf.append_to_task("1.1", "new");
+
+        assert!(!tf.tasks[0].done);
+        assert!(!tf.tasks[0].subtasks[0].done);
+    }
+    // }}}
+    // }}}
+
+    // Editing tasks {{{
+    #[test]
+    fn test_edit_task() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.edit_task("1", "new");
+        tf.edit_task("1.1", "new");
+
+        assert_eq!(tf.tasks[0].contents, "new");
+        assert_eq!(tf.tasks[0].subtasks[0].contents, "new");
+    }
+    // }}}
+
+    #[test]
+    fn test_edit_task_undo_done() {
+        // {{{
+        let mut tf = get_test_done_task_file();
+        tf.edit_task("1", "new");
+
+        assert!(!tf.tasks[0].done);
+
+        tf = get_test_done_task_file();
+        tf.edit_task("1.1", "new");
+
+        assert!(!tf.tasks[0].done);
+        assert!(!tf.tasks[0].subtasks[0].done);
+    }
+    // }}}
+    // }}}
+
+    // Deleting tasks {{{
+    #[test]
+    fn test_delete_task() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.delete_task("2.2");
+        tf.delete_task("1");
+
+        assert_eq!(tf.tasks.len(), 1);
+        assert_eq!(tf.tasks[0].subtasks.len(), 1)
+    }
+    // }}}
+
+    #[test]
+    fn test_clear_dones() {
+        // {{{
+        let mut tf = get_test_task_file();
+        tf.tasks[0].done = true;
+        tf.tasks[1].subtasks[0].done = true;
+        tf.clear_dones();
+
+        assert_eq!(tf.tasks.len(), 1);
+        assert_eq!(tf.tasks[0].subtasks.len(), 1);
+    }
+    // }}}
+    // }}}
 }
 // }}}
