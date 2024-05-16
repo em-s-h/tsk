@@ -97,7 +97,7 @@ impl TaskFile {
                 }
 
                 if t.subtasks.len() != 0 {
-                    _print(&t.subtasks, colored, format!("{id}.").as_str(), depth)
+                    _print(&t.subtasks, colored, format!("{id}.").as_str(), depth + 1)
                 }
             }
         }
