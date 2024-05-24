@@ -68,6 +68,10 @@ impl TaskFile {
     }
     // }}}
 
+    fn get_subtask_id(v: &str) -> Vec<usize> {
+        v.split('.').map(|i| i.parse().unwrap()).collect()
+    }
+
     pub fn print(&self, colored: bool) {
         // {{{
         fn _print(tasks: &[Task], colored: bool, t_id: &str, depth: usize) {
@@ -162,25 +166,26 @@ impl TaskFile {
         fn _mark(tasks: &mut [Task], done: bool, p_id: &[usize], ids: &[usize], depth: usize) {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
-                if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
+                if id + 1 == p_id[depth] && p_id.len() - 1 == depth {
                     mark(&mut t.subtasks, done, ids, false);
-                    let all_done = t.subtasks.iter().find(|t| !t.done).is_none();
-                    t.done = all_done;
+                    t.done = t.subtasks.iter().find(|t| !t.done).is_none();
                     return;
                 } else if id + 1 == p_id[depth] {
                     _mark(&mut t.subtasks, done, p_id, ids, depth + 1);
-                    let all_done = t.subtasks.iter().find(|t| !t.done).is_none();
-                    t.done = all_done;
+                    t.done = t.subtasks.iter().find(|t| !t.done).is_none();
                     return;
                 }
             }
         }
         // }}}
 
+        // Another recursive function is necessary in case the task being marked as done has
+        // subtasks, or in case the user passes a range/list of sub-ids.
         fn mark(tasks: &mut [Task], done: bool, ids: &[usize], all: bool) {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
                 if ids.contains(&(id + 1)) || all {
+                    println!("{ids:?} : {id}");
                     t.done = done;
                     if t.subtasks.len() != 0 {
                         mark(&mut t.subtasks, done, ids, true)
@@ -196,11 +201,13 @@ impl TaskFile {
             println!("Unmarking tasks...");
         }
         if ids[0].contains('.') {
+            println!("{ids:?}");
             let parent_id: Vec<usize> = ids[0]
                 .split_terminator('.')
                 .map(|i| i.parse().unwrap())
                 .collect();
             let s_ids: Vec<usize> = ids.iter().skip(1).map(|i| i.parse().unwrap()).collect();
+            println!("{parent_id:?} : {s_ids:?}");
             _mark(&mut self.tasks, done, &parent_id, &s_ids, 0);
             return;
         }
@@ -441,7 +448,7 @@ impl TaskFile {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
                 if id + 1 == s_id[depth] && s_id.len() - 1 == depth + 1 {
-                    t.subtasks.remove(s_id[depth] - 1);
+                    t.subtasks.remove(s_id[depth + 1] - 1);
                     return;
                 } else if id + 1 == s_id[depth] {
                     _delete(&mut t.subtasks, s_id, depth + 1);
@@ -496,10 +503,6 @@ impl TaskFile {
         }
     }
     // }}}
-
-    fn get_subtask_id(v: &str) -> Vec<usize> {
-        v.split('.').map(|i| i.parse().unwrap()).collect()
-    }
 }
 // }}}
 

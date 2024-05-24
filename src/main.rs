@@ -22,9 +22,11 @@ fn main() {
     }
 
     // Operations {{{
-    let single_id = if cli.task_ids[0].contains('.') {
-        format!("{}{}", cli.task_ids[0], cli.task_ids[1])
+    let single_id = if cli.task_ids.len() > 1 {
+        // For subtask id
+        format!("{}.{}", cli.task_ids[0], cli.task_ids[1])
     } else {
+        // For normal task id
         cli.task_ids[0].clone()
     };
 

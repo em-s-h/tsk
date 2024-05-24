@@ -298,7 +298,11 @@ impl Cli {
                         process::exit(1)
                     }
                 }
-                arg.split_inclusive('.').map(|i| i.to_owned()).collect()
+                if let Some(t) = arg.rsplit_once('.') {
+                    vec![t.0.to_owned(), t.1.to_owned()]
+                } else {
+                    vec![arg]
+                }
                 // }}}
             };
             // }}}
