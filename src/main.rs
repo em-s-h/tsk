@@ -57,7 +57,6 @@ fn main() {
 
     task_file.print(cli.colored_output);
     task_file.save_to_file(&file_path)
-    // tsk::run(cli);
 }
 
 pub fn get_task_file_path() -> PathBuf {
@@ -75,7 +74,7 @@ pub fn get_task_file_path() -> PathBuf {
         Ok(false) | Err(_) => {
             println!("Creating new 'tasks' file\n");
 
-            let f = format!("{}/tasks.json", data_dir.to_str().unwrap());
+            let f =format!("{}/tasks.json", data_dir.to_str().unwrap());
             File::create(f).is_err().then(|| {
                 eprintln!("Unable to create 'tasks' file");
                 process::exit(1);
@@ -93,3 +92,7 @@ pub fn get_task_file_path() -> PathBuf {
     tasks_file
 }
 // }}}
+
+// Required for integration tests
+#[cfg(test)]
+mod tests{}

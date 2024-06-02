@@ -56,14 +56,16 @@ echo "Test: Fail when passing empty string or wrong option"
 ## {{{
 set +e
 out=$(tsk_d add 2>&1) ; ex=$?
-out2=$(tsk_d add -not 2>&1) ; ex2=$?
+out2=$(tsk_d add -not "a" 2>&1) ; ex2=$?
+out3=$(tsk_d add -sub 50 "a" 2>&1) ; ex3=$?
+out4=$(tsk_d add -sub 50.50 "a" 2>&1) ; ex4=$?
 set -e
 
 if [[ $SHOW_OUT ]]; then
-    echo -e "$out \n $out2"
+    echo -e "$out \n $out2 \n $out3 \n $out4"
 fi
 
-[[ $(($ex + $ex2)) -eq 2 ]]
+[[ $(($ex + $ex2 + $ex3 + $ex4)) -eq 4 ]]
 echo "${GRE}OK${NC}"
 ## }}}
 

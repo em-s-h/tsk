@@ -185,7 +185,6 @@ impl TaskFile {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
                 if ids.contains(&(id + 1)) || all {
-                    println!("{ids:?} : {id}");
                     t.done = done;
                     if t.subtasks.len() != 0 {
                         mark(&mut t.subtasks, done, ids, true)
@@ -200,14 +199,12 @@ impl TaskFile {
         } else {
             println!("Unmarking tasks...");
         }
-        if ids[0].contains('.') {
-            println!("{ids:?}");
+        if ids[0].contains('.') || ids.len() == 2 {
             let parent_id: Vec<usize> = ids[0]
                 .split_terminator('.')
                 .map(|i| i.parse().unwrap())
                 .collect();
             let s_ids: Vec<usize> = ids.iter().skip(1).map(|i| i.parse().unwrap()).collect();
-            println!("{parent_id:?} : {s_ids:?}");
             _mark(&mut self.tasks, done, &parent_id, &s_ids, 0);
             return;
         }
