@@ -52,6 +52,112 @@ echo "${GRE}OK${NC}"
 
 reset_file 
 
+echo "Test: Add subtask to task top"
+## {{{
+
+tsk_d add -top "Test" &> /dev/null
+
+echo "- No flag"
+### {{{
+task="sub-test1"
+out=$(tsk_d add -sub 1 "$task")
+
+if [[ $SHOW_OUT ]]; then
+    echo "$out"
+fi
+
+grep -qe "\s1\.1\..*$task" <<< "$out"
+echo "${GRE}OK${NC}"
+### }}}
+
+echo "- With flag"
+### {{{
+task="sub-test2"
+out=$(tsk_d add -top -sub 1 "$task")
+
+if [[ $SHOW_OUT ]]; then 
+    echo "$out"
+fi
+
+grep -qe "\s1\.1\..*$task" <<< "$out"
+echo "${GRE}OK${NC}"
+### }}}
+
+## }}}
+
+reset_file 
+
+echo "Test: Add subtask to task bottom"
+## {{{
+tsk_d add -top "Test" &> /dev/null
+tsk_d add -sub 1 "subtest1" &> /dev/null
+tsk_d add -sub 1 "subtest2" &> /dev/null
+task="subtest3"
+out=$(tsk_d add -bot -sub 1 "$task")
+
+if [[ $SHOW_OUT ]]; then
+    echo "$out"
+fi
+
+grep -qe "\s1\.3\..*$task" <<< "$out"
+echo "${GRE}OK${NC}"
+## }}}
+
+reset_file 
+
+echo "Test: Add subtask to subtask top"
+## {{{
+
+tsk_d add -top "Test" &> /dev/null
+tsk_d add -sub 1 "Subtest" &> /dev/null
+
+echo "- No flag"
+### {{{
+task="sub-sub-test1"
+out=$(tsk_d add -sub 1.1 "$task")
+
+if [[ $SHOW_OUT ]]; then
+    echo "$out"
+fi
+
+grep -qe "\s1\.1\.1\..*$task" <<< "$out"
+echo "${GRE}OK${NC}"
+### }}}
+
+echo "- With flag"
+### {{{
+task="sub-sub-test2"
+out=$(tsk_d add -top -sub 1.1 "$task")
+
+if [[ $SHOW_OUT ]]; then 
+    echo "$out"
+fi
+
+grep -qe "\s1\.1\.1\..*$task" <<< "$out"
+echo "${GRE}OK${NC}"
+### }}}
+
+## }}}
+
+reset_file 
+
+echo "Test: Add subtask to subtask bottom"
+## {{{
+tsk_d add -top "Test" &> /dev/null
+tsk_d add -sub 1 "Subtest" &> /dev/null
+tsk_d add -sub 1.1 "sub-sub-test1" &> /dev/null
+tsk_d add -sub 1.1 "sub-sub-test2" &> /dev/null
+task="sub-sub-test3"
+out=$(tsk_d add -bot -sub 1.1 "$task")
+
+if [[ $SHOW_OUT ]]; then
+    echo "$out"
+fi
+
+grep -qe "\s1\.1\.3\..*$task" <<< "$out"
+echo "${GRE}OK${NC}"
+## }}}
+
 echo "Test: Fail when passing empty string or wrong option"
 ## {{{
 set +e

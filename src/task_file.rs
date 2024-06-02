@@ -199,13 +199,25 @@ impl TaskFile {
         } else {
             println!("Unmarking tasks...");
         }
-        if ids[0].contains('.') || ids.len() == 2 {
-            let parent_id: Vec<usize> = ids[0]
-                .split_terminator('.')
+        if ids[0].contains('.') {
+            if ids.len() > 1 {
+                let p_id: Vec<usize> = ids[0]
+                    .split_terminator('.')
+                    .map(|i| i.parse().unwrap())
+                    .collect();
+                let s_ids: Vec<usize> = ids.iter().skip(1).map(|i| i.parse().unwrap()).collect();
+                _mark(&mut self.tasks, done, &p_id, &s_ids, 0);
+                return;
+            }
+            let ids: Vec<usize> = ids[0]
+                .split('.')
                 .map(|i| i.parse().unwrap())
                 .collect();
-            let s_ids: Vec<usize> = ids.iter().skip(1).map(|i| i.parse().unwrap()).collect();
-            _mark(&mut self.tasks, done, &parent_id, &s_ids, 0);
+            let len = ids.len();
+            let p_id = &ids[..len -1];
+            let s_id = &ids[len -1..];
+        
+            _mark(&mut self.tasks, done, &p_id, &s_id, 0);
             return;
         }
 
@@ -735,7 +747,7 @@ mod test {
     fn test_mark_sub() {
         // {{{
         let mut tf = get_test_task_file();
-        tf.mark_tasks(&["1.".to_owned(), "1".to_owned()], true);
+        tf.mark_tasks(&["1.1".to_owned()], true);
 
         assert!(!tf.tasks[0].done);
         assert!(tf.tasks[0].subtasks[0].done);
@@ -751,7 +763,7 @@ mod test {
         assert!(!tf.tasks[1].done);
 
         tf = get_test_done_task_file();
-        tf.mark_tasks(&["1.".to_owned(), "1".to_owned()], false);
+        tf.mark_tasks(&["1.1".to_owned()], false);
         tf.print(true);
 
         assert!(!tf.tasks[0].done);

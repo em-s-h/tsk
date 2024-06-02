@@ -22,13 +22,7 @@ fn main() {
     }
 
     // Operations {{{
-    let single_id = if cli.task_ids.len() > 1 {
-        // For subtask id
-        format!("{}.{}", cli.task_ids[0], cli.task_ids[1])
-    } else {
-        // For normal task id
-        cli.task_ids[0].clone()
-    };
+    let single_id = cli.task_ids[0].clone();
 
     if cli.add_task {
         task_file.add_task(&cli.task, &cli.add_to, &single_id)

@@ -197,7 +197,7 @@ impl Cli {
             ret
             // }}}
         } else if arg.contains(',') {
-            // Multiple ids {{{
+            // List of ids {{{
             let (v, t) = prep(",");
             let mut ret: Vec<String> = Vec::new();
             if t.1 == "0" {
@@ -251,11 +251,7 @@ impl Cli {
                     process::exit(1)
                 }
             }
-            if let Some(t) = arg.rsplit_once('.') {
-                vec![t.0.to_owned(), t.1.to_owned()]
-            } else {
-                vec![arg]
-            }
+            vec![arg]
             // }}}
         };
         // }}}
@@ -401,18 +397,9 @@ impl Cli {
                 process::exit(1);
             }
 
-            self.new_id = if v.len() > 1 {
-                format!("{}.{}", v[0], v[1])
-            } else {
-                v[0].clone()
-            };
+            self.new_id = v[0].clone();
 
-            let s = if self.task_ids.len() > 1 {
-                format!("{}.{}", self.task_ids[0], self.task_ids[1])
-            } else {
-                self.task_ids[0].clone()
-            };
-            if self.new_id == s {
+            if self.new_id == self.task_ids[0] {
                 eprintln!("Please provide different task ids");
                 process::exit(1);
             }
