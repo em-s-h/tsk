@@ -68,7 +68,7 @@ pub fn get_task_file_path() -> PathBuf {
         Ok(false) | Err(_) => {
             println!("Creating new 'tasks' file\n");
 
-            let f =format!("{}/tasks.json", data_dir.to_str().unwrap());
+            let f = format!("{}/tasks.json", data_dir.to_str().unwrap());
             File::create(f).is_err().then(|| {
                 eprintln!("Unable to create 'tasks' file");
                 process::exit(1);
@@ -89,4 +89,4 @@ pub fn get_task_file_path() -> PathBuf {
 
 // Required for integration tests
 #[cfg(test)]
-mod tests{}
+mod tests {}

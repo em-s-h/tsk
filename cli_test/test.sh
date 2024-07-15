@@ -31,6 +31,16 @@ export RED=$(tput setaf 1) # Red
 export GRE=$(tput setaf 2) # Green
 export NC=$(tput sgr0)     # No color & format
 
+recover_backup() { # {{{
+    if [[ -f ~/.local/share/tsk/tasks.json.bak ]]; then
+        echo "Recovering backup"
+        mv ~/.local/share/tsk/tasks.json.bak $TASK_F
+    fi
+}
+# }}}
+
+trap recover_backup EXIT
+
 if [[ -f $TASK_F ]]; then
     # {{{
     if [[ ! -f ~/.local/share/tsk/tasks.json.bak ]]; then
@@ -68,7 +78,4 @@ echo
 bash ./clear_test.sh
 echo
 
-if [[ -f ~/.local/share/tsk/tasks.json.bak ]]; then
-    echo "Recovering backup"
-    mv ~/.local/share/tsk/tasks.json.bak $TASK_F
-fi
+recover_backup
