@@ -209,14 +209,11 @@ impl TaskFile {
                 _mark(&mut self.tasks, done, &p_id, &s_ids, 0);
                 return;
             }
-            let ids: Vec<usize> = ids[0]
-                .split('.')
-                .map(|i| i.parse().unwrap())
-                .collect();
+            let ids: Vec<usize> = ids[0].split('.').map(|i| i.parse().unwrap()).collect();
             let len = ids.len();
-            let p_id = &ids[..len -1];
-            let s_id = &ids[len -1..];
-        
+            let p_id = &ids[..len - 1];
+            let s_id = &ids[len - 1..];
+
             _mark(&mut self.tasks, done, &p_id, &s_id, 0);
             return;
         }
@@ -231,23 +228,24 @@ impl TaskFile {
         fn _get(tasks: &mut [Task], s_id: &[usize], depth: usize) -> Task {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
-                if id + 1 == s_id[depth] && s_id.len() - 1 == depth + 1 {
+                // Stop at the parent
+                if id == s_id[depth] && s_id.len() - 1 == depth + 1 {
                     return t.subtasks.get(s_id[depth + 1]).unwrap().clone();
-                } else if id + 1 == s_id[depth] {
+                } else if id == s_id[depth] {
                     return _get(&mut t.subtasks, s_id, depth + 1);
                 }
             }
-            panic!("This should never happen");
+            panic!("This should never happen. {s_id:?}, {depth}, {tasks:#?}");
         }
         // }}}
 
         fn _put(tasks: &mut [Task], task: Task, s_id: &[usize], depth: usize) {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
-                if id + 1 == s_id[depth] && s_id.len() - 1 == depth + 1 {
+                if id == s_id[depth] && s_id.len() - 1 == depth + 1 {
                     t.subtasks.insert(s_id[depth + 1], task);
                     return;
-                } else if id + 1 == s_id[depth] {
+                } else if id == s_id[depth] {
                     _put(&mut t.subtasks, task, s_id, depth + 1);
                     return;
                 }
@@ -258,15 +256,15 @@ impl TaskFile {
         fn _remove(tasks: &mut [Task], s_id: &[usize], depth: usize) {
             // {{{
             for (id, t) in tasks.iter_mut().enumerate() {
-                if id + 1 == s_id[depth] && s_id.len() - 1 == depth + 1 {
+                if id == s_id[depth] && s_id.len() - 1 == depth + 1 {
                     t.subtasks.remove(s_id[depth + 1]);
                     return;
-                } else if id + 1 == s_id[depth] {
+                } else if id == s_id[depth] {
                     _remove(&mut t.subtasks, s_id, depth + 1);
                     return;
                 }
             }
-            panic!("This should never happen");
+            panic!("This should never happen. {s_id:?}, {depth}, {tasks:#?}");
         }
         // }}}
 
@@ -275,8 +273,9 @@ impl TaskFile {
             // Initializing important variables {{{
             let (fid, fsid) = if from.contains('.') {
                 let mut sub_id = Self::get_subtask_id(from);
-                let last = sub_id.len() - 1;
-                sub_id[last] -= 1;
+                sub_id.iter_mut().for_each(|i| *i -= 1);
+                // let last = sub_id.len() - 1;
+                // sub_id[last] -= 1;
                 (0, sub_id)
             } else {
                 let from: usize = from.parse().unwrap();
@@ -285,8 +284,9 @@ impl TaskFile {
 
             let (tid, tsid) = if to.contains('.') {
                 let mut sub_id = Self::get_subtask_id(to);
-                let last = sub_id.len() - 1;
-                sub_id[last] -= 1;
+                sub_id.iter_mut().for_each(|i| *i -= 1);
+                // let last = sub_id.len() - 1;
+                // sub_id[last] -= 1;
                 (0, sub_id)
             } else {
                 let to: usize = to.parse().unwrap();
@@ -304,6 +304,7 @@ impl TaskFile {
         };
 
         if to.contains('.') {
+            // Both are sub-ids and belong to the same parent
             if from.contains('.')
                 && from_sub_id[..from_sub_id.len() - 2] == to_sub_id[..to_sub_id.len() - 2]
             {
@@ -312,20 +313,23 @@ impl TaskFile {
                 return;
             }
             _put(&mut self.tasks, task, &to_sub_id, 0);
-        } else {
-            if !from.contains('.') {
-                self.tasks.remove(from_id);
-                self.tasks.insert(to_id, task);
-                return;
-            }
-            self.tasks.insert(to_id, task);
+            self.tasks.remove(from_id);
+            return;
         }
 
         if !from.contains('.') {
             self.tasks.remove(from_id);
+            self.tasks.insert(to_id, task);
             return;
         }
-        _remove(&mut self.tasks, &from_sub_id, 0)
+        _remove(&mut self.tasks, &from_sub_id, 0);
+        self.tasks.insert(to_id, task);
+        //
+        // if !from.contains('.') {
+        //     self.tasks.remove(from_id);
+        //     return;
+        // }
+        // _remove(&mut self.tasks, &from_sub_id, 0)
     }
     // }}}
 
