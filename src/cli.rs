@@ -114,7 +114,8 @@ impl Cli {
         let arg = Self::get_next(args);
         let prep = |pat: &str| -> (Vec<String>, (String, String)) {
             // {{{
-            // "1.2.3,5,..." -> "1.2.3", "5" "..."
+            // "1.2.3,5,..." -> "1.2.3", "5", "..."
+            // "1.2.3..5" -> "1.2.3", "5", "..."
             let v: Vec<String> = arg.split(pat).map(|s| s.to_owned()).collect();
             // "1.2.3" -> "1.2", "3"
             let t = {
@@ -127,14 +128,15 @@ impl Cli {
 
             let t = (t.0.to_owned(), t.1.to_owned());
 
-            let f: f32 = t.0.parse().unwrap_or_else(|_| {
-                eprintln!("Invalid subtask id: {arg}");
-                process::exit(1)
-            });
-            if f < 1.0 {
-                eprintln!("Invalid subtask id: {arg}");
+            if v.contains(&"0".to_owned()) {
+                eprintln!("Invalid id: '{arg}'");
                 process::exit(1)
             }
+            if let Some(_) = v[0].split('.').find(|i| *i == "0") {
+                eprintln!("Invalid id: '{}'", v[0]);
+                process::exit(1)
+            }
+
             let _: usize = t.1.parse().unwrap_or_else(|_| {
                 eprintln!("Invalid subtask id: '{arg}'");
                 process::exit(1)
@@ -144,7 +146,9 @@ impl Cli {
         // }}}
 
         if arg == "-all" {
-            return (1..=Self::get_task_count()).map(|i| i.to_string()).collect();
+            return (1..=Self::get_task_count())
+                .map(|i| i.to_string())
+                .collect();
         } else if arg.is_empty() || arg == "0" {
             eprintln!("Invalid id: '{arg}'");
             process::exit(1);
@@ -157,6 +161,7 @@ impl Cli {
             eprintln!("Invalid id: '{arg}'");
             process::exit(1);
         }
+        let _a = arg.clone();
 
         let ids: Vec<String> = if arg.contains("..") {
             // {{{
@@ -180,7 +185,8 @@ impl Cli {
             };
 
             if to > last_id {
-                eprintln!("Invalid range: {to}, value above last id");
+                eprintln!("Invalid range: '{to}'");
+                eprintln!("Value above last id.");
                 process::exit(1)
             }
             let mut ret: Vec<String> = Vec::new();
@@ -208,6 +214,7 @@ impl Cli {
                         || v[i].parse::<usize>().unwrap() > Self::get_task_count()
                     {
                         eprintln!("Invalid task id: '{}'", v[1]);
+                        eprintln!("Task doesn't exist.");
                         process::exit(1)
                     }
                     ret.push(v[i].to_string())
@@ -224,6 +231,7 @@ impl Cli {
                     || v[i].parse::<usize>().unwrap() > Self::get_subtask_count(&t.0)
                 {
                     eprintln!("Invalid subtask id: '{}.{}'", t.0, v[1]);
+                    eprintln!("Task doesn't exist.");
                     process::exit(1)
                 }
                 ret.push(v[i].to_string())
@@ -243,11 +251,13 @@ impl Cli {
                 let (_, t) = prep(",");
                 if t.1.parse::<usize>().unwrap() > Self::get_subtask_count(&t.0) {
                     eprintln!("Invalid subtask id: '{arg}'");
+                    eprintln!("Task doesn't exist.");
                     process::exit(1)
                 }
             } else {
                 if arg.parse::<usize>().unwrap() > Self::get_task_count() {
                     eprintln!("Invalid task id: '{arg}'");
+                    eprintln!("Task doesn't exist.");
                     process::exit(1)
                 }
             }
