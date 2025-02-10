@@ -1,10 +1,4 @@
-use crate::task_file::{AddPosition, Task, TaskFile};
-use std::{
-    env::{self, Args},
-    fmt::Debug,
-    iter::Peekable,
-    process,
-};
+use std::{cmp::Ordering, env, error::Error, fmt::Debug, process};
 
 const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -13,470 +7,304 @@ const NAME: &str = env!("CARGO_PKG_NAME");
 
 #[derive(Debug)]
 pub struct Cli {
-    // {{{
-    /// The task that will be added to the task file
-    pub task: String,
-
-    /// Id of the task/subtask or tasks to be operated
-    pub task_ids: Vec<String>,
-
-    /// Used when moving tasks
-    pub new_id: String,
-
+    /// Don't make the output colored
+    // #[arg(long = "no-color", default_value_t = false)]
     pub colored_output: bool,
-    pub print: bool,
 
-    pub add_task: bool,
-    pub add_to: AddPosition,
+    /// The command to run.
+    // #[arg(
+    //     default_value_t = String::from("print"),
+    //     long_help = "The command to run
+    //     \nprint                     : Print all tasks
+    //     \nadd  [add_to] [id] [task] : Add a task or subtask
+    //     \ndo   [id]                 : Mark task(s) as done
+    //     \nundo [id]                 : Unmark task(s) as done
+    //         ")]
+    pub command: String,
 
-    pub mark_done: bool,
-    pub unmark_done: bool,
+    /// Where to add a new task (top/bottom).
+    // #[arg(
+    //     short = 't',
+    //     default_value_t = String::from("top"),
+    // )]
+    pub add_to: String,
 
-    pub move_task: bool,
-    pub swap_tasks: bool,
+    /// Comma separeted list of ids/subids.
+    /// Range pattern example: 1..3 = 1, 2, 3
+    // #[arg(
+    //     required = false,
+    //     required_if_eq_any = [
+    //         ("command", "do"),
+    //         ("command", "undo"),
+    //         ("command", "move"),
+    //         ("command", "swap"),
+    //         ("command", "edit"),
+    //         ("command", "append"),
+    //         ("command", "delete"),
+    //     ]
+    // )]
+    pub task_ids: String,
 
-    pub append_task: bool,
-    pub edit_task: bool,
+    /// Single id for commands that move tasks
+    // #[arg(
+    //     required = false,
+    //     required_if_eq_any = [
+    //         ("command", "move"),
+    //         ("command", "swap"),
+    //     ]
+    // )]
+    pub move_id: String,
 
-    pub delete_task: bool,
-    pub clear_dones: bool,
-    pub enable_debug: bool,
+    /// Text for commands that modify a task's content
+    // #[arg(
+    //     required = false,
+    //     required_if_eq_any = [
+    //         ("command", "add"),
+    //         ("command", "append"),
+    //         ("command", "edit"),
+    //     ]
+    // )]
+    pub contents: String,
 }
-// }}}
 
 impl Cli {
-    // {{{
-    pub fn new() -> Self {
-        // {{{
-        Self {
-            task: String::new(),
-            task_ids: vec![String::new()],
-            new_id: String::new(),
-
-            colored_output: true,
-            print: false,
-            mark_done: false,
-            unmark_done: false,
-            add_task: false,
-            add_to: AddPosition::Top,
-            append_task: false,
-            edit_task: false,
-            move_task: false,
-            swap_tasks: false,
-            delete_task: false,
-            clear_dones: false,
-            enable_debug: false,
-        }
-    }
-    // }}}
-
-    fn get_task_count() -> usize {
-        // {{{
-        let path = crate::get_task_file_path();
-        let tf = TaskFile::parse_file(&path);
-        tf.tasks.len()
-    }
-    // }}}
-
-    fn get_subtask_count(parent_id: &str) -> usize {
-        // {{{
-        let v: Vec<usize> = parent_id.split('.').map(|i| i.parse().unwrap()).collect();
-        let path = crate::get_task_file_path();
-        let tf = TaskFile::parse_file(&path);
-
-        fn _get(tasks: &[Task], p_id: &[usize], depth: usize) -> Option<usize> {
-            // p_id = 1.2
-            for (id, t) in tasks.iter().enumerate() {
-                if id + 1 == p_id[depth] && p_id.len() == depth + 1 {
-                    // 1.2 <- We are here
-                    return Some(t.subtasks.len());
-                } else if id + 1 == p_id[depth] {
-                    // 1 <- We are here
-                    return _get(&t.subtasks, p_id, depth + 1);
-                }
-            }
-            None
-        }
-        if let Some(r) = _get(&tf.tasks, &v, 0) {
-            r
-        } else {
-            eprintln!("Unable to find subtasks for the id: {}", parent_id);
-            process::exit(1)
-        }
-    }
-    // }}}
-
-    fn get_task_ids<T>(args: &mut T) -> Vec<String>
-    // {{{
-    where
-        T: Iterator<Item = String> + Debug,
-    {
-        let arg = Self::get_next(args);
-        let prep = |pat: &str| -> (Vec<String>, (String, String)) {
-            // {{{
-            // "1.2.3,5,..." -> "1.2.3", "5", "..."
-            // "1.2.3..5" -> "1.2.3", "5", "..."
-            let v: Vec<String> = arg.split(pat).map(|s| s.to_owned()).collect();
-            // "1.2.3" -> "1.2", "3"
-            let t = {
-                if let Some(t) = v[0].rsplit_once('.') {
-                    t
-                } else {
-                    (v[0].as_str(), "0")
-                }
-            };
-
-            let t = (t.0.to_owned(), t.1.to_owned());
-
-            if v.contains(&"0".to_owned()) {
-                eprintln!("Invalid id: '{arg}'");
-                process::exit(1)
-            }
-            if let Some(_) = v[0].split('.').find(|i| *i == "0") {
-                eprintln!("Invalid id: '{}'", v[0]);
-                process::exit(1)
-            }
-
-            let _: usize = t.1.parse().unwrap_or_else(|_| {
-                eprintln!("Invalid subtask id: '{arg}'");
-                process::exit(1)
-            });
-            (v, t)
-        };
-        // }}}
-
-        if arg == "-all" {
-            return (1..=Self::get_task_count())
-                .map(|i| i.to_string())
-                .collect();
-        } else if arg.is_empty() || arg == "0" {
-            eprintln!("Invalid id: '{arg}'");
-            process::exit(1);
-        } else if arg.starts_with('-') {
-            eprintln!("Invalid sub-option: '{arg}'");
-            process::exit(1);
-        }
-
-        if !arg.contains(|c: char| c.is_ascii_digit() || c == '.' || c == ',') {
-            eprintln!("Invalid id: '{arg}'");
-            process::exit(1);
-        }
-        let _a = arg.clone();
-
-        let ids: Vec<String> = if arg.contains("..") {
-            // {{{
-            // Range of ids {{{
-            let (v, t) = prep("..");
-            if v.len() != 2 || v[1].contains('.') {
-                eprintln!("Invalid subtask id: '{arg}'");
-                process::exit(1)
-            }
-
-            let from: usize = t.1.parse().unwrap();
-            let to: usize = v[1].parse().unwrap_or_else(|_| {
-                eprintln!("Invalid subtask id: '{arg}'");
-                process::exit(1)
-            });
-
-            let last_id = if from == 0 {
-                Self::get_task_count()
-            } else {
-                Self::get_subtask_count(&t.0)
-            };
-
-            if to > last_id {
-                eprintln!("Invalid range: '{to}'");
-                eprintln!("Value above last id.");
-                process::exit(1)
-            }
-            let mut ret: Vec<String> = Vec::new();
-            let from = if from == 0 {
-                t.0.parse().unwrap()
-            } else {
-                ret.push(format!("{}.", t.0));
-                from
-            };
-
-            for i in from..=to {
-                ret.push(i.to_string())
-            }
-            ret
-            // }}}
-        } else if arg.contains(',') {
-            // List of ids {{{
-            let (v, t) = prep(",");
-            let mut ret: Vec<String> = Vec::new();
-            if t.1 == "0" {
-                ret.push(t.0);
-                for i in 1..v.len() {
-                    if v[i].contains('.')
-                        || v[i].parse::<usize>().is_err()
-                        || v[i].parse::<usize>().unwrap() > Self::get_task_count()
-                    {
-                        eprintln!("Invalid task id: '{}'", v[1]);
-                        eprintln!("Task doesn't exist.");
-                        process::exit(1)
-                    }
-                    ret.push(v[i].to_string())
-                }
-                ret.sort();
-                ret.dedup();
-                return ret;
-            }
-            ret.push(t.1);
-
-            for i in 1..v.len() {
-                if v[i].contains('.')
-                    || v[i].parse::<usize>().is_err()
-                    || v[i].parse::<usize>().unwrap() > Self::get_subtask_count(&t.0)
-                {
-                    eprintln!("Invalid subtask id: '{}.{}'", t.0, v[1]);
-                    eprintln!("Task doesn't exist.");
-                    process::exit(1)
-                }
-                ret.push(v[i].to_string())
-            }
-            ret.sort();
-            ret.insert(0, format!("{}.", t.0));
-            ret.dedup();
-            ret
-            // }}}
-        } else {
-            // Single id {{{
-            if let Some(_) = arg.split('.').find(|i| i.parse::<usize>().is_err()) {
-                eprintln!("Invalid subtask id: '{arg}'");
-                process::exit(1)
-            }
-            if arg.contains('.') {
-                let (_, t) = prep(",");
-                if t.1.parse::<usize>().unwrap() > Self::get_subtask_count(&t.0) {
-                    eprintln!("Invalid subtask id: '{arg}'");
-                    eprintln!("Task doesn't exist.");
-                    process::exit(1)
-                }
-            } else {
-                if arg.parse::<usize>().unwrap() > Self::get_task_count() {
-                    eprintln!("Invalid task id: '{arg}'");
-                    eprintln!("Task doesn't exist.");
-                    process::exit(1)
-                }
-            }
-            vec![arg]
-            // }}}
-        };
-        // }}}
-        ids
-    }
-    // }}}
-
-    fn get_next<T>(args: &mut T) -> String
-    // {{{
-    where
-        T: Iterator<Item = String>,
-    {
-        match args.next() {
-            Some(a) => a.trim().to_owned(),
-            _ => String::new(),
-        }
-    }
-    // }}}
-
-    pub fn parse_args(mut self) -> Self {
-        // {{{
-        let mut args = env::args().peekable();
-        args.next(); // First argument is unneeded
-
-        let opt = Self::get_next(&mut args);
-
-        // Parse the first option passed to the program {{{
-        if opt == "--help" || opt == "-h" {
-            Cli::print_help();
-            process::exit(0)
-        } else if opt == "--version" || opt == "-v" {
-            Cli::print_version();
-            process::exit(0)
-        } else if opt == "--no-color" {
-            self.colored_output = false;
-        } else if opt.starts_with('-') {
-            eprintln!("Invalid option '{opt}'");
-            process::exit(1)
-        }
-
-        // In case the user passes the '--no-color' option
-        let arg = if opt.starts_with('-') {
-            Self::get_next(&mut args)
-        } else {
-            opt
-        };
-        // }}}
-
-        if arg == "print" || arg.is_empty() {
-            self.print = true;
-            return self;
-        } else if arg == "clear" {
-            self.clear_dones = true;
-            return self;
-        }
-
-        match arg.as_str() {
-            // Operations {{{
-            "do" => self.mark_done = true,
-            "undo" => self.unmark_done = true,
-            "add" => self.add_task = true,
-            "append" => self.append_task = true,
-            "edit" => self.edit_task = true,
-            "move" => self.move_task = true,
-            "swap" => self.swap_tasks = true,
-            "delete" => self.delete_task = true,
-            _ => {
-                eprintln!("'{arg}' is not a valid argument");
-                process::exit(1)
-            }
-        }
-        // }}}
-
-        let requires_id = self.mark_done
-        // {{{
-            || self.unmark_done
-            || self.append_task
-            || self.edit_task
-            || self.move_task
-            || self.swap_tasks
-            || self.delete_task;
-        // }}}
-
-        if requires_id {
-            self.task_ids = Self::get_task_ids(&mut args)
-        }
-
-        let is_opt = |a: &mut Peekable<Args>| {
-            let def = String::new();
-            let next = a.peek().unwrap_or(&def);
-            next.starts_with('-')
-        };
-
-        if self.add_task && is_opt(&mut args) {
-            // 'add' options {{{
-            let opt = Self::get_next(&mut args);
-            let mut _opt = |opt: &str, args: &mut Peekable<Args>| {
-                if opt == "-top" {
-                    self.add_to = AddPosition::Top;
-                } else if opt == "-bot" {
-                    self.add_to = AddPosition::Bottom;
-                } else if opt == "-sub" {
-                    self.task_ids = Self::get_task_ids(args);
-                } else {
-                    eprintln!("Invalid sub-option: '{opt}'");
-                    eprintln!("Valid options are: '-bot', '-top' and '-sub'");
-                    process::exit(1)
-                }
-            };
-            _opt(&opt, &mut args);
-
-            if is_opt(&mut args) {
-                let opt2 = Self::get_next(&mut args);
-                if opt == opt2 {
-                    eprintln!("Duplicate sub-options, processing last.")
-                }
-                _opt(&opt2, &mut args)
-            }
-        }
-        // }}}
-
-        if self.add_task || self.append_task || self.edit_task {
-            self.task = Self::get_next(&mut args);
-            if self.task.is_empty() {
-                eprintln!("Please provide the content of the task");
-                process::exit(1);
-            }
-        }
-
-        if self.move_task || self.swap_tasks {
-            let v = Self::get_task_ids(&mut args);
-
-            // Get task ids of the 2 ids passed
-            let p_id1: usize = v[0].split('.').next().unwrap().parse().unwrap();
-            let p_id2: usize = self.task_ids[0].split('.').next().unwrap().parse().unwrap();
-
-            // Check if we are operating with a task and a sub-task, or vice-versa.
-            let task_and_sub = (v[0].contains('.') && !self.task_ids[0].contains('.'))
-                || (!v[0].contains('.') && self.task_ids[0].contains('.'));
-
-            if p_id1 == p_id2 && task_and_sub {
-                eprintln!("Cannot operate on both a task and its subtasks");
-                process::exit(1);
-            }
-
-            self.new_id = v[0].clone();
-
-            if self.new_id == self.task_ids[0] {
-                eprintln!("Please provide different task ids");
-                process::exit(1);
-            }
-        }
-        self
-    }
-    // }}}
-
     pub fn print_help() {
         // {{{
         println!(
-            "{NAME}: {DESCRIPTION}
-Made by: {AUTHOR}
+            "{NAME} {VERSION}: {DESCRIPTION}
+        Made by: {AUTHOR}
 
-Usage: {NAME} [Options] [Command] [Sub-Options] [Args]
+        Usage: {NAME} [Options] [Command] [Sub-Options] [Args]
 
-Options:
-    --help      -h
-        Print this message
-    --version   -v
-        Print the program version
-    --no-color
-        Don't make the output colored
+        Options:
+            --help      -h
+                Print this message
+            --version   -v
+                Print the program version
+            --no-color
+                Don't make the output colored
+            --add-to -t=[position] 
+                Used by `add`; Values: top, bot[tom]
+            --subtask -s=[parent_id]
+                Used by `add` to add a task as a subtask.
 
-Commands:
-    print
-        Print tasks, default when not passing any args
-    add     <task>
-        Add a new task
-    do      <task_ids>
-        Mark 1 or more tasks as done
-    undo    <task_ids>
-        Unmark 1 or more tasks as done
-    move    <task_id> <new_task_id>
-        Move a task to a new location
-    swap    <task_id> <other_task_id>
-        Swap the places of two tasks
-    append  <task_id> <content>
-        Append content to an existing task
-    edit    <task_id> <new_task>
-        Replace the contents of a task
-    delete  <task_ids>
-        Delete 1 task
-    clear   
-        Delete all tasks that are marked as done
-
-Sub-Options:
-    -top
-        Used by 'add' to add tasks to the top of the task list (default)
-    -bot
-        Used by 'add' to add tasks to the bottom of the task list
-    -all
-        Used by 'do' & 'undo' to un/mark all tasks as done"
+        Commands:
+            print
+                Print tasks, default when not passing any args
+            add     <task>
+                Add a new task.
+            do      <task_ids>
+                Mark task(s) as done
+            undo    <task_ids>
+                Unmark task(s) as done
+            move    <task_id> <new_task_id>
+                Move a task to a new location
+            swap    <task_id> <other_task_id>
+                Swap the places of two tasks
+            append  <task_id> <text>
+                Append <text> to an existing task
+            edit    <task_id> <new_text>
+                Replace the text of the task with <new_text>
+            delete  <task_ids>
+                Delete 1 task
+            clear   
+                Delete all tasks that are marked as done
+        "
         );
     }
-    // }}}
 
     pub fn print_version() {
-        // {{{
-        println!("{NAME}: {DESCRIPTION}\n{VERSION}");
+        println!("{NAME} {VERSION}")
     }
-    // }}}
+
+    pub fn parse_args() -> Self {
+        let mut cli = Self {
+            colored_output: true,
+            command: "print".to_owned(),
+            add_to: "top".to_owned(),
+            task_ids: String::new(),
+            move_id: String::new(),
+            contents: String::new(),
+        };
+        let options = env::args().filter(|a| a.starts_with('-'));
+
+        for o in options {
+            match o.as_str() {
+                "-h" | "--help" => {
+                    Cli::print_help();
+                    process::exit(0)
+                }
+                "-v" | "--version" => {
+                    println!("{VERSION}");
+                    process::exit(0)
+                }
+                "--no-color" => cli.colored_output = false,
+                _ => (),
+            }
+            if !o.contains('=') {
+                continue;
+            }
+            let v: Vec<&str> = o.split('=').collect();
+            match v[0] {
+                "-t" | "--add-to" => {
+                    if v[1] != "top" || v[1] != "bot" || v[1] != "bottom" {
+                        eprintln!("Invalid value `{}`", v[1]);
+                        process::exit(1)
+                    }
+                    cli.add_to = v[1].to_string();
+                }
+                "-s" | "--subtask" => cli.task_ids = v[1].to_string(),
+                _ => {
+                    eprintln!("Unknown option `{}`", v[0]);
+                    process::exit(1)
+                }
+            }
+        }
+
+        let mut args = env::args().filter(|a| !a.starts_with('-'));
+        args.next(); // Path of executable not needed.
+
+        let arg = args.next();
+        if arg.is_none() {
+            return cli;
+        }
+
+        let arg = arg.unwrap();
+        match arg.as_str() {
+            "print" => return cli,
+            "clear" => {
+                cli.command = arg;
+                return cli;
+            }
+            "add" | "do" | "undo" | "move" | "swap" | "edit" | "append" | "delete" => {
+                cli.command = arg;
+            }
+            _ => {
+                eprintln!("Unknown command `{arg}`");
+                process::exit(1)
+            }
+        }
+
+        let arg = args.next().unwrap_or_else(|| {
+            eprintln!("Missing arguments for command `{}`", cli.command);
+            process::exit(1)
+        });
+
+        if cli.command != "add" {
+            cli.task_ids = arg;
+        } else {
+            cli.contents = arg;
+        }
+
+        let arg = args.next().unwrap_or_else(|| {
+            eprintln!("Missing arguments for command `{}`", cli.command);
+            process::exit(1)
+        });
+
+        match cli.command.as_str() {
+            "move" | "swap" => cli.move_id = arg,
+            "edit" | "append" => cli.contents = arg,
+            _ => (),
+        }
+        cli
+    }
+
+    /// Takes a list of ids and returns it dedupped and sorted.
+    pub fn parse_id_list(ids: &str) -> Result<String, Box<dyn Error>> {
+        let mut v: Vec<String> = ids.split(',').map(|i| i.to_string()).collect();
+        if !ids.contains('.') {
+            let err = v.iter().find_map(|s| s.parse::<usize>().err());
+            if let Some(e) = err {
+                return Err(Box::new(e));
+            }
+
+            v.sort_by(|a, b| {
+                a.parse::<usize>()
+                    .unwrap()
+                    .cmp(&b.parse::<usize>().unwrap())
+            });
+
+            v.dedup();
+            return Ok(v.join(","));
+        }
+        let err = v.iter().find_map(|s| s.parse::<f32>().err());
+        if let Some(e) = err {
+            return Err(Box::new(e));
+        }
+
+        v.sort_by(|a, b| {
+            let a = a.parse::<f32>().unwrap();
+            let b = b.parse::<f32>().unwrap();
+
+            if a >= b {
+                return Ordering::Greater;
+            } else {
+                return Ordering::Less;
+            }
+        });
+
+        v.dedup();
+        Ok(v.join(","))
+    }
+
+    /// Takes a range pattern and returns a list of ids.
+    pub fn parse_id_range(ids: &str) -> Result<String, Box<dyn Error>> {
+        let v: Vec<String> = ids.split("..").map(|i| i.to_string()).collect();
+        let start: usize = if v[0].contains('.') {
+            let v: Vec<&str> = v[0].split('.').collect();
+            v[0].parse()?
+        } else {
+            v[0].parse()?
+        };
+
+        let end: usize = if v[1].contains('.') {
+            let v: Vec<&str> = v[1].split('.').collect();
+            v[0].parse()?
+        } else {
+            v[1].parse()?
+        };
+
+        let mut out: Vec<String> = (start..=end).map(|i| i.to_string()).collect();
+        let l = out.len() - 1;
+
+        out[0] = v[0].clone();
+        out[l] = v[1].clone();
+        return Ok(out.join(","));
+    }
 }
-// }}}
 
 #[cfg(test)]
 mod test {
-    // {{{
+    use super::*;
+
+    #[test]
+    fn test_parse_id_list_normal_ids() {
+        let res = Cli::parse_id_list("1,2,3,4,4,3,12,5");
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap_or("".to_string()), "1,2,3,4,5,12".to_string());
+    }
+
+    #[test]
+    fn test_parse_id_list_sub_ids() {
+        let res = Cli::parse_id_list("1.2,2.3,3.3,4,4,3.3,12,5");
+        assert!(res.is_ok());
+        assert_eq!(
+            res.unwrap_or("".to_string()),
+            "1.2,2.3,3.3,4,5,12".to_string()
+        );
+    }
+
+    #[test]
+    fn test_parse_id_range_normal_ids() {
+        let res = Cli::parse_id_range("1..5");
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap_or("".to_string()), "1,2,3,4,5".to_string());
+    }
+
+    #[test]
+    fn test_parse_id_range_sub_ids() {
+        let res = Cli::parse_id_range("1.2..5.9");
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap_or("".to_string()), "1.2,2,3,4,5.9".to_string());
+    }
 }
-// }}}
