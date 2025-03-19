@@ -7,63 +7,22 @@ const NAME: &str = env!("CARGO_PKG_NAME");
 
 #[derive(Debug)]
 pub struct Cli {
-    /// Don't make the output colored
-    // #[arg(long = "no-color", default_value_t = false)]
+    /// Make `print` output colored.
     pub colored_output: bool,
 
     /// The command to run.
-    // #[arg(
-    //     default_value_t = String::from("print"),
-    //     long_help = "The command to run
-    //     \nprint                     : Print all tasks
-    //     \nadd  [add_to] [id] [task] : Add a task or subtask
-    //     \ndo   [id]                 : Mark task(s) as done
-    //     \nundo [id]                 : Unmark task(s) as done
-    //         ")]
     pub command: String,
 
-    /// Where to add a new task (top/bottom).
-    // #[arg(
-    //     short = 't',
-    //     default_value_t = String::from("top"),
-    // )]
+    /// Where to add a new task.
     pub add_to: String,
 
     /// Comma separeted list of ids/subids.
-    /// Range pattern example: 1..3 = 1, 2, 3
-    // #[arg(
-    //     required = false,
-    //     required_if_eq_any = [
-    //         ("command", "do"),
-    //         ("command", "undo"),
-    //         ("command", "move"),
-    //         ("command", "swap"),
-    //         ("command", "edit"),
-    //         ("command", "append"),
-    //         ("command", "delete"),
-    //     ]
-    // )]
     pub task_ids: String,
 
-    /// Single id for commands that move tasks
-    // #[arg(
-    //     required = false,
-    //     required_if_eq_any = [
-    //         ("command", "move"),
-    //         ("command", "swap"),
-    //     ]
-    // )]
+    /// Single id for commands that move tasks.
     pub move_id: String,
 
-    /// Text for commands that modify a task's content
-    // #[arg(
-    //     required = false,
-    //     required_if_eq_any = [
-    //         ("command", "add"),
-    //         ("command", "append"),
-    //         ("command", "edit"),
-    //     ]
-    // )]
+    /// Text for commands that modify a task's content.
     pub contents: String,
 }
 
@@ -113,10 +72,6 @@ impl Cli {
         );
     }
 
-    pub fn print_version() {
-        println!("{NAME} {VERSION}")
-    }
-
     pub fn parse_args() -> Self {
         let mut cli = Self {
             colored_output: true,
@@ -135,7 +90,7 @@ impl Cli {
                     process::exit(0)
                 }
                 "-v" | "--version" => {
-                    println!("{VERSION}");
+                    println!("{NAME} {VERSION}");
                     process::exit(0)
                 }
                 "--no-color" => cli.colored_output = false,
@@ -147,7 +102,7 @@ impl Cli {
             let v: Vec<&str> = o.split('=').collect();
             match v[0] {
                 "-t" | "--add-to" => {
-                    if v[1] != "top" || v[1] != "bot" || v[1] != "bottom" {
+                    if v[1] != "top" && v[1] != "bot" && v[1] != "bottom" {
                         eprintln!("Invalid value `{}`", v[1]);
                         process::exit(1)
                     }
@@ -190,14 +145,18 @@ impl Cli {
             process::exit(1)
         });
 
-        if cli.command != "add" {
-            cli.task_ids = arg;
-        } else {
+        if cli.command == "add" {
             cli.contents = arg;
+            return cli;
+        }
+        cli.task_ids = arg;
+        match cli.command.as_str() {
+            "do" | "undo" | "delete" => return cli,
+            _ => (),
         }
 
         let arg = args.next().unwrap_or_else(|| {
-            eprintln!("Missing arguments for command `{}`", cli.command);
+            eprintln!("Missing additional arguments for command `{}`", cli.command);
             process::exit(1)
         });
 
@@ -278,33 +237,44 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_parse_id_list_normal_ids() {
+    fn test_parse_list_normal_ids() {
         let res = Cli::parse_id_list("1,2,3,4,4,3,12,5");
-        assert!(res.is_ok());
-        assert_eq!(res.unwrap_or("".to_string()), "1,2,3,4,5,12".to_string());
+        let res = res.unwrap_or_default();
+        assert_eq!(res, "1,2,3,4,5,12".to_string());
     }
 
     #[test]
-    fn test_parse_id_list_sub_ids() {
+    fn test_parse_list_sub_ids() {
+        let res = Cli::parse_id_list("3.3,2.3,1.2,3.3");
+        let res = res.unwrap_or_default();
+        assert_eq!(res, "1.2,2.3,3.3".to_string());
+    }
+
+    #[test]
+    fn test_parse_list_mixed_ids() {
         let res = Cli::parse_id_list("1.2,2.3,3.3,4,4,3.3,12,5");
-        assert!(res.is_ok());
-        assert_eq!(
-            res.unwrap_or("".to_string()),
-            "1.2,2.3,3.3,4,5,12".to_string()
-        );
+        let res = res.unwrap_or_default();
+        assert_eq!(res, "1.2,2.3,3.3,4,5,12".to_string());
     }
 
     #[test]
-    fn test_parse_id_range_normal_ids() {
+    fn test_parse_range_normal_ids() {
         let res = Cli::parse_id_range("1..5");
-        assert!(res.is_ok());
-        assert_eq!(res.unwrap_or("".to_string()), "1,2,3,4,5".to_string());
+        let res = res.unwrap_or_default();
+        assert_eq!(res, "1,2,3,4,5".to_string());
     }
 
     #[test]
-    fn test_parse_id_range_sub_ids() {
+    fn test_parse_range_sub_ids() {
         let res = Cli::parse_id_range("1.2..5.9");
-        assert!(res.is_ok());
-        assert_eq!(res.unwrap_or("".to_string()), "1.2,2,3,4,5.9".to_string());
+        let res = res.unwrap_or_default();
+        assert_eq!(res, "1.2,2,3,4,5.9".to_string());
+    }
+
+    #[test]
+    fn test_parse_range_mixed_ids() {
+        let res = Cli::parse_id_range("1..5.9");
+        let res = res.unwrap_or_default();
+        assert_eq!(res, "1,2,3,4,5.9".to_string());
     }
 }
