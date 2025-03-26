@@ -6,7 +6,10 @@ pub mod cli;
 pub mod task_file;
 
 fn main() {
-    let cli = Cli::parse_args();
+    let cli = Cli::parse_args(None).unwrap_or_else(|e| {
+        eprintln!("Error: {e}");
+        process::exit(1)
+    });
     let mut task_file = TaskFile::load();
 
     // Commands that don't need ids
@@ -45,6 +48,15 @@ fn main() {
         }
     } else if cli.task_ids.contains("..") {
         match Cli::parse_id_range(&cli.task_ids) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("{e}");
+                process::exit(1)
+            }
+        }
+    } else if cli.task_ids == "all" {
+        let i = format!("1..{}", task_file.get_task_count());
+        match Cli::parse_id_range(&i) {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("{e}");
@@ -102,6 +114,9 @@ fn verify_ids(ids: &str, tf: &TaskFile) -> Result<(), String> {
     if ids.is_empty() {
         return Err("No id provided".to_owned());
     }
+    if ids == "all" {
+        return Ok(());
+    }
     if ids == "0" {
         return Err(format!("Invalid id `{ids}`"));
     }
@@ -153,7 +168,3 @@ fn verify_ids(ids: &str, tf: &TaskFile) -> Result<(), String> {
     }
     Ok(())
 }
-
-// Required for integration tests
-#[cfg(test)]
-mod tests {}

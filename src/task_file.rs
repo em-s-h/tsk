@@ -470,9 +470,10 @@ mod test {
         }
     }
 
-    // Enable output for this test.
+    // I've not found a way to automatically test `print` so for now it's ignored by default
+    // and requires manual testing, or just do `cargo r`
     #[test]
-    #[ignore]
+    #[ignore = "Manually view the output of this test"]
     fn test_print() {
         let tf = get_test_task_file();
         tf.print(true);
