@@ -84,7 +84,7 @@ impl TaskFile {
     }
 
     pub fn save(&self) {
-        match serde_json::to_string(&self) {
+        match serde_json::to_string_pretty(&self) {
             Ok(json) => fs::write(&self.task_file_path, json)
                 .expect("File has been verified to be writable"),
             Err(err) => {
