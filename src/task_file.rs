@@ -103,6 +103,27 @@ impl TaskFile {
         self.tasks[id].subtasks.iter().count()
     }
 
+    pub fn get_task_contents(&self, id: &str) -> Option<String> {
+        if !id.contains('.') {
+            let id = Self::parse_id(id);
+            if let Some(t) = self.tasks.get(id) {
+                return Some(t.contents.clone());
+            }
+            return None;
+        }
+        let id = Self::parse_sub_id(id);
+        let t = self.tasks.get(id[0]);
+        if t.is_none() {
+            return None;
+        }
+        let t = t.unwrap();
+
+        if let Some(st) = t.subtasks.get(id[1]) {
+            return Some(st.contents.clone());
+        }
+        return None;
+    }
+
     fn parse_id(id: &str) -> usize {
         let id: usize = id.parse().expect("`id` verified to be usize in `main.rs`");
         id - 1
@@ -151,7 +172,6 @@ impl TaskFile {
     }
 
     pub fn add_task(&mut self, contents: &str, to: &str, task_id: &str) {
-        println!("Adding task...");
         let task = Task {
             contents: contents.to_owned(),
             done: false,
@@ -184,12 +204,6 @@ impl TaskFile {
     }
 
     pub fn mark_tasks(&mut self, ids: &str, done: bool) {
-        if done {
-            println!("Marking tasks as done...");
-        } else {
-            println!("Unmarking tasks...");
-        }
-
         let (ids, sub_ids) = if ids.contains('.') {
             let id1: Vec<usize> = ids
                 .split(',')
@@ -237,7 +251,6 @@ impl TaskFile {
     }
 
     pub fn move_task(&mut self, from: &str, to: &str) {
-        println!("Moving task...");
         if !from.contains('.') {
             let from = Self::parse_id(from);
             let task = self.tasks.remove(from);
@@ -270,7 +283,6 @@ impl TaskFile {
     }
 
     pub fn swap_tasks(&mut self, task1: &str, task2: &str) {
-        println!("Swapping tasks...");
         let t1 = if task1.contains('.') {
             let id = Self::parse_sub_id(task1);
 
@@ -305,7 +317,6 @@ impl TaskFile {
     }
 
     pub fn append_to_task(&mut self, id: &str, content: &str) {
-        println!("Appending content...");
         let content = format!(" {content}");
 
         if !id.contains('.') {
@@ -324,7 +335,6 @@ impl TaskFile {
     }
 
     pub fn edit_task(&mut self, id: &str, new_content: &str) {
-        println!("Editing task...");
         let new_content = new_content.to_owned();
 
         if !id.contains('.') {
@@ -342,7 +352,6 @@ impl TaskFile {
     }
 
     pub fn delete_task(&mut self, id: &str) {
-        println!("Deleting task...");
         if !id.contains('.') {
             let id = Self::parse_id(id);
             self.tasks.remove(id);
@@ -353,7 +362,6 @@ impl TaskFile {
     }
 
     pub fn clear_dones(&mut self) {
-        println!("Clearing done tasks...");
         self.tasks = self
             .tasks
             .iter()
@@ -539,7 +547,6 @@ mod test {
             .map(|t| t.contents.as_str())
             .collect();
 
-        println!("{:#?}", tf);
         assert_eq!(v, ["one", "two"]);
         assert_eq!(sv0, ["one", "two"]);
         assert_eq!(sv1, ["one", "two", "sub3", "sub4"]);

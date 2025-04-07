@@ -7,7 +7,7 @@ pub mod task_file;
 
 fn main() {
     let cli = Cli::parse_args(None).unwrap_or_else(|e| {
-        eprintln!("Error: {e}");
+        eprintln!("Cli error: {e}");
         process::exit(1)
     });
     let mut task_file = TaskFile::load();
@@ -34,7 +34,7 @@ fn main() {
     }
 
     if let Err(e) = verify_ids(&cli.task_ids, &task_file) {
-        eprintln!("Error: {e}");
+        eprintln!("Id error: {e}");
         process::exit(1)
     }
 
@@ -69,7 +69,7 @@ fn main() {
 
     if cli.command == "move" || cli.command == "swap" {
         if let Err(e) = verify_ids(&cli.move_id, &task_file) {
-            eprintln!("Error: {e}");
+            eprintln!("Id error: {e}");
             process::exit(1)
         }
     }

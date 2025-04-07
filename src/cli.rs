@@ -3,15 +3,18 @@ use std::{
     env::{self},
     error::Error,
     fmt::Debug,
+    io::{self, Write},
     process,
 };
+
+use crate::task_file::TaskFile;
 
 const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const AUTHOR: &str = env!("CARGO_PKG_AUTHORS");
 const NAME: &str = env!("CARGO_PKG_NAME");
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Cli {
     /// Make `print` output colored.
     pub colored_output: bool,
@@ -33,6 +36,17 @@ pub struct Cli {
 }
 
 impl Cli {
+    pub fn new() -> Self {
+        Self {
+            colored_output: true,
+            command: "print".to_owned(),
+            add_to: "top".to_owned(),
+            task_ids: String::new(),
+            move_id: String::new(),
+            contents: String::new(),
+        }
+    }
+
     pub fn print_help() {
         // {{{
         println!(
@@ -42,6 +56,8 @@ impl Cli {
         Usage: {NAME} [Options] [Command] [Sub-Options] [Args]
 
         Options:
+            --generate-shell-completions <prompt> <current_word>,<position>
+                Generate shell completions
             --help      -h
                 Print this message
             --version   -v
@@ -49,11 +65,12 @@ impl Cli {
             --no-color  -c
                 Don't make the output colored
             --all       -a
-                Shortcut for selecting all tasks,
-                not used by commands that use only a single id
-            --add-to    -t=[position] 
-                Used by `add`; Values: top, bot[tom]
-            --subtask   -s=[parent_id]
+                Shortcut for selecting all tasks.
+                Not used by commands that use only a single id
+            --add-to    -t=<position> 
+                Used by `add`.
+                Values: top, bot[tom]
+            --subtask   -s=<parent_id>
                 Used by `add` to add a task as a subtask.
 
         Commands:
@@ -81,15 +98,87 @@ impl Cli {
         );
     }
 
-    pub fn new() -> Self {
-        Self {
-            colored_output: true,
-            command: "print".to_owned(),
-            add_to: "top".to_owned(),
-            task_ids: String::new(),
-            move_id: String::new(),
-            contents: String::new(),
+    /// Generate shell completions.
+    /// `args` should be formatted this way: "$prompt $current_word,$position"
+    /// Ex.: "tsk ad -t = top 'hi' ad,1"
+    pub fn generate_shell_completions(args: Vec<String>) -> Result<String, &'static str> {
+        if args.is_empty() {
+            return Ok("".to_string());
         }
+
+        let no_opts: Vec<String> = {
+            let mut a: Vec<String> = args
+                .iter()
+                .filter(|a| !a.starts_with('-'))
+                .map(|a| a.to_string())
+                .collect();
+
+            for _ in 0..a.iter().filter(|_a| *_a == "=").count() {
+                let id = a.iter().position(|_a| _a == "=").unwrap_or_default();
+                if id == 0 {
+                    continue;
+                }
+                a.remove(id + 1);
+                a.remove(id);
+            }
+            a
+        };
+
+        let (current_word, position) = {
+            let l = args.last().unwrap();
+            if !l.contains(',') {
+                return Err("Missing `$current_word,$position`");
+            }
+            let a: Vec<&str> = l.split(',').collect();
+            (a[0], a[1].parse::<usize>().unwrap_or_default())
+        };
+
+        // `position` will always be >=1 since that's when app specific completions start.
+        if position == 0 {
+            return Err("Current word position is not usize");
+        }
+
+        // Find the position of the '=' that the user is at.
+        let near_eq = current_word == "=" || args[position - 1] == "=";
+        if near_eq {
+            let opt = if current_word == "=" {
+                &args[position - 1]
+            } else if args[position - 1] == "=" {
+                &args[position - 2]
+            } else {
+                ""
+            };
+
+            if near_eq && (opt == "-t" || opt == "--add-to") {
+                return Ok("top bottom".to_string());
+            }
+        }
+
+        if current_word.starts_with("--") {
+            return Ok(
+                "--help --version --no-color --all --add-to --subtask --generate-shell-completions"
+                    .to_string(),
+            );
+        } else if current_word.starts_with('-') {
+            return Ok("-h -v -c -a -t -s".to_string());
+        } else if position == 1 || no_opts.get(1).is_some_and(|a| a == current_word) {
+            return Ok("print add do undo move swap append edit delete clear".to_string());
+        }
+
+        if no_opts.get(1).is_some_and(|a| a == "edit")
+            && no_opts.get(3).is_some_and(|a| a.is_empty())
+        {
+            let id = no_opts.get(2).unwrap_or_else(|| process::exit(1));
+            let id = id.parse::<usize>().unwrap_or_else(|_| process::exit(1));
+
+            let tf = TaskFile::load();
+            if let Some(cont) = tf.get_task_contents(&id.to_string()) {
+                return Ok(format!("'{cont}'"));
+            }
+            return Ok("".to_string());
+        }
+
+        Ok("".to_string())
     }
 
     /// Parse cmd line arguments.
@@ -117,6 +206,23 @@ impl Cli {
                 }
                 "-c" | "--no-color" => cli.colored_output = false,
                 "-a" | "--all" => cli.task_ids = "all".to_string(),
+
+                "--generate-shell-completions" => {
+                    let args: Vec<String> = env::args()
+                        .skip_while(|i| i != "--generate-shell-completions")
+                        .skip(1)
+                        .collect();
+
+                    let res = Self::generate_shell_completions(args);
+                    if let Ok(out) = res {
+                        print!("{out}");
+                        io::stdout().flush().unwrap();
+                        process::exit(0)
+                    } else if let Err(e) = res {
+                        eprintln!("{e}");
+                        process::exit(1)
+                    }
+                }
 
                 _ if !o.contains('=') => return Err(format!("Unknown option `{o}`")),
                 _ => (),
@@ -282,8 +388,169 @@ impl Cli {
 mod test {
     use super::*;
 
+    // // SHELL COMPLETIONS
+    /// `args` ex.: "tsk ad -t = top 'hello world' ad,1"
+    fn get_comp(args: &str) -> Result<String, &'static str> {
+        let a: Vec<String> = if args.is_empty() {
+            vec![]
+        } else {
+            args.split(' ').map(|s| s.to_string()).collect()
+        };
+        Cli::generate_shell_completions(a)
+    }
+
+    #[test]
+    fn test_cmd_completion() {
+        let comp = get_comp("tsk    ,1");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "print add do undo move swap append edit delete clear"
+        );
+
+        let comp = get_comp("tsk ad ad,1");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "print add do undo move swap append edit delete clear"
+        );
+
+        let comp = get_comp("tsk ze ze,1");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "print add do undo move swap append edit delete clear"
+        );
+    }
+
+    #[test]
+    fn test_cmd_completion_after_options() {
+        let comp = get_comp("tsk -a    ,2");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "print add do undo move swap append edit delete clear"
+        );
+
+        let comp = get_comp("tsk -a sw sw,2");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "print add do undo move swap append edit delete clear"
+        );
+
+        let comp = get_comp("tsk -a -s = 2    ,5");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "print add do undo move swap append edit delete clear"
+        );
+
+        let comp = get_comp("tsk -a -s = 2 pr pr,5");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "print add do undo move swap append edit delete clear"
+        );
+    }
+
+    #[test]
+    fn test_short_option_completion() {
+        let comp = get_comp("tsk - -,1");
+        assert!(comp.is_ok());
+        assert_eq!(comp.unwrap(), "-h -v -c -a -t -s");
+
+        let comp = get_comp("tsk -c -c,1");
+        assert!(comp.is_ok());
+        assert_eq!(comp.unwrap(), "-h -v -c -a -t -s");
+
+        let comp = get_comp("tsk -z -z,1");
+        assert!(comp.is_ok());
+        assert_eq!(comp.unwrap(), "-h -v -c -a -t -s");
+    }
+
+    #[test]
+    fn test_long_option_completion() {
+        let comp = get_comp("tsk -- --,1");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "--help --version --no-color --all --add-to --subtask --generate-shell-completions"
+        );
+
+        let comp = get_comp("tsk --h --h,1");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "--help --version --no-color --all --add-to --subtask --generate-shell-completions"
+        );
+
+        let comp = get_comp("tsk --z --z,1");
+        assert!(comp.is_ok());
+        assert_eq!(
+            comp.unwrap(),
+            "--help --version --no-color --all --add-to --subtask --generate-shell-completions"
+        );
+    }
+
+    #[test]
+    fn test_add_to_option_completion() {
+        let comp = get_comp("tsk -t =    ,3");
+        assert!(comp.is_ok());
+        assert_eq!(comp.unwrap(), "top bottom");
+
+        let comp = get_comp("tsk --add-to =    ,3");
+        assert!(comp.is_ok());
+        assert_eq!(comp.unwrap(), "top bottom");
+
+        let comp = get_comp("tsk -t = =,2");
+        assert!(comp.is_ok());
+        assert_eq!(comp.unwrap(), "top bottom");
+
+        let comp = get_comp("tsk --add-to = =,2");
+        assert!(comp.is_ok());
+        assert_eq!(comp.unwrap(), "top bottom");
+    }
+
+    #[test]
+    fn test_edit_completion() {
+        let comp = get_comp("tsk edit 2    ,3");
+        let tf = TaskFile::load();
+        assert!(comp.is_ok());
+
+        let cont = if let Some(c) = tf.get_task_contents("2") {
+            format!("'{c}'")
+        } else {
+            "".to_string()
+        };
+        assert_eq!(comp.unwrap(), cont);
+    }
+
+    #[test]
+    fn test_incorrect_completion_args() {
+        let comp = get_comp("tsk edit 2    3");
+        assert!(comp.is_err());
+
+        let comp = get_comp("tsk edit 2    ,-1");
+        assert!(comp.is_err());
+
+        let comp = get_comp("tsk edit 2    ,a");
+        assert!(comp.is_err());
+    }
+
+    #[test]
+    fn test_empty_completion() {
+        let comp = get_comp("");
+        assert!(comp.is_ok());
+        assert_eq!(comp.unwrap(), "");
+
+        let comp = get_comp("tsk add -t = 2 'hello'    ,5");
+        assert!(comp.is_ok());
+        assert_eq!(comp.unwrap(), "");
+    }
+
     // // ARG PARSING
-    /// `args` ex: "tsk add -t=top 'hello world' "
+    /// `args` ex.: "tsk add -t=top 'hello world' "
     fn get_cli(args: &str) -> Result<Cli, String> {
         let args = args.trim();
         let a = args.split(' ').map(|s| s.to_owned()).collect();
@@ -373,7 +640,7 @@ mod test {
 
         let cli = get_cli("tsk");
         assert!(cli.is_ok());
-        assert_eq!(cli.unwrap(), Cli::new());
+        assert_eq!(cli.unwrap().command, "print");
 
         let cli = get_cli("tsk clear");
         assert!(cli.is_ok());
