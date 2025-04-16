@@ -133,25 +133,22 @@ impl Cli {
             (a[0], a[1].parse::<usize>().unwrap_or_default())
         };
 
-        // `position` will always be >=1 since that's when app specific completions start.
+        // A correct `position` is always >=1, as that's when app specific completions start.
         if position == 0 {
             return Err("Current word position is not usize");
         }
 
         // Find the position of the '=' that the user is at.
-        let near_eq = current_word == "=" || args[position - 1] == "=";
-        if near_eq {
-            let opt = if current_word == "=" {
-                &args[position - 1]
-            } else if args[position - 1] == "=" {
-                &args[position - 2]
-            } else {
-                ""
-            };
+        let opt = if current_word == "=" {
+            &args.get(position - 1).unwrap_or_else(|| process::exit(1))
+        } else if args.get(position - 1).is_some_and(|a| a == "=") {
+            &args.get(position - 2).unwrap_or_else(|| process::exit(1))
+        } else {
+            ""
+        };
 
-            if near_eq && (opt == "-t" || opt == "--add-to") {
-                return Ok("top bottom".to_string());
-            }
+        if opt == "-t" || opt == "--add-to" {
+            return Ok("top bottom".to_string());
         }
 
         if current_word.starts_with("--") {
