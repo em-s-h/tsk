@@ -104,6 +104,8 @@ impl Cli {
     pub fn generate_shell_completions(args: Vec<String>) -> Result<String, &'static str> {
         if args.is_empty() {
             return Ok("".to_string());
+        } else if args.contains(&"--generate-shell-completions".to_string()) {
+            return Ok("".to_string());
         }
 
         let no_opts: Vec<String> = {
@@ -162,9 +164,7 @@ impl Cli {
             return Ok("print add do undo move swap append edit delete clear".to_string());
         }
 
-        if no_opts.get(1).is_some_and(|a| a == "edit")
-            && no_opts.get(3).is_some_and(|a| a.is_empty())
-        {
+        if no_opts.get(1).is_some_and(|a| a == "edit") && position == 3 {
             let id = no_opts.get(2).unwrap_or_else(|| process::exit(1));
             let id = id.parse::<usize>().unwrap_or_else(|_| process::exit(1));
 
