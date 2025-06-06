@@ -33,7 +33,7 @@ fn main() {
         _ => (),
     }
 
-    if let Err(e) = verify_ids(&cli.task_ids, &task_file) {
+    if let Err(e) = verify_ids(&cli.task_ids, &task_file, cli.allow_id_list) {
         eprintln!("Id error: {e}");
         process::exit(1)
     }
@@ -68,7 +68,7 @@ fn main() {
     };
 
     if cli.command == "move" || cli.command == "swap" {
-        if let Err(e) = verify_ids(&cli.move_id, &task_file) {
+        if let Err(e) = verify_ids(&cli.move_id, &task_file, cli.allow_id_list) {
             eprintln!("Id error: {e}");
             process::exit(1)
         }
@@ -110,7 +110,7 @@ fn main() {
     task_file.print(cli.colored_output);
 }
 
-fn verify_ids(ids: &str, tf: &TaskFile) -> Result<(), String> {
+fn verify_ids(ids: &str, tf: &TaskFile, allow_list: bool) -> Result<(), String> {
     if ids.is_empty() {
         return Err("No id provided".to_owned());
     }
@@ -119,6 +119,10 @@ fn verify_ids(ids: &str, tf: &TaskFile) -> Result<(), String> {
     }
     if ids == "0" {
         return Err(format!("Invalid id `{ids}`"));
+    }
+
+    if (ids.contains(',') || ids.contains("..")) && !allow_list {
+        return Err("Command only accepts a single id".to_owned());
     }
     if ids.contains(|c: char| !c.is_digit(10) && c != '.' && c != ',') {
         return Err("Id contains invalid characters".to_owned());

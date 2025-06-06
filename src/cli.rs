@@ -33,6 +33,9 @@ pub struct Cli {
 
     /// Text for commands that modify a task's content.
     pub contents: String,
+
+    /// Should id lists be allowed.
+    pub allow_id_list: bool,
 }
 
 impl Cli {
@@ -44,6 +47,7 @@ impl Cli {
             task_ids: String::new(),
             move_id: String::new(),
             contents: String::new(),
+            allow_id_list: false,
         }
     }
 
@@ -268,7 +272,11 @@ impl Cli {
                 cli.command = arg;
                 return Ok(cli);
             }
-            "add" | "do" | "undo" | "move" | "swap" | "edit" | "append" | "delete" => {
+            "do" | "undo" => {
+                cli.command = arg;
+                cli.allow_id_list = true
+            }
+            "add" | "move" | "swap" | "edit" | "append" | "delete" => {
                 cli.command = arg;
             }
             _ => {
