@@ -251,6 +251,7 @@ impl Cli {
             }
         }
 
+        // Use debug arguments, ortherwise normal arguments.
         let mut args = if let Some(a) = dbg_args {
             let a: Vec<String> = a.into_iter().filter(|a| !a.starts_with('-')).collect();
             a.into_iter()
@@ -365,26 +366,47 @@ impl Cli {
 
     /// Takes a range pattern and returns a list of ids.
     pub fn parse_id_range(ids: &str) -> Result<String, Box<dyn Error>> {
-        let v: Vec<String> = ids.split("..").map(|i| i.to_string()).collect();
-        let start: usize = if v[0].contains('.') {
-            let v: Vec<&str> = v[0].split('.').collect();
+        let ids: Vec<String> = ids.split("..").map(|i| i.to_string()).collect();
+
+        // Ranges of subids are not allowed, so take both parent numbers
+        // and make a range of them.
+        let start: usize = if ids[0].contains('.') {
+            let v: Vec<&str> = ids[0].split('.').collect();
             v[0].parse()?
         } else {
-            v[0].parse()?
+            ids[0].parse()?
         };
 
-        let end: usize = if v[1].contains('.') {
-            let v: Vec<&str> = v[1].split('.').collect();
+        let end: usize = if ids[1].contains('.') {
+            let v: Vec<&str> = ids[1].split('.').collect();
             v[0].parse()?
         } else {
-            v[1].parse()?
+            ids[1].parse()?
         };
 
-        let mut out: Vec<String> = (start..=end).map(|i| i.to_string()).collect();
+        // Allow for 5..8 and 8..5
+        let range = if start < end {
+            start..=end
+        } else {
+            end..=start
+        };
+
+        let mut out: Vec<String> = range.map(|i| i.to_string()).collect();
         let l = out.len() - 1;
 
-        out[0] = v[0].clone();
-        out[l] = v[1].clone();
+        // Replace the start and end values with the proper ids.
+        if ids[0].contains('.') {
+            // Determine where `ids[0]` (the `start` id with a subid) should be put.
+            // start..=end - start < end
+            // end..=start - start > end
+
+            let i = if start > end { l } else { 0 };
+            out[i] = ids[0].clone();
+        }
+        if ids[1].contains('.') {
+            let i = if start > end { 0 } else { l };
+            out[i] = ids[1].clone();
+        }
         return Ok(out.join(","));
     }
 }
@@ -841,6 +863,10 @@ mod test {
         let res = Cli::parse_id_range("1..5");
         let res = res.unwrap_or_default();
         assert_eq!(res, "1,2,3,4,5".to_string());
+
+        let res = Cli::parse_id_range("5..1");
+        let res = res.unwrap_or_default();
+        assert_eq!(res, "1,2,3,4,5".to_string());
     }
 
     #[test]
@@ -848,11 +874,19 @@ mod test {
         let res = Cli::parse_id_range("1.2..5.9");
         let res = res.unwrap_or_default();
         assert_eq!(res, "1.2,2,3,4,5.9".to_string());
+
+        let res = Cli::parse_id_range("5.9..1.2");
+        let res = res.unwrap_or_default();
+        assert_eq!(res, "1.2,2,3,4,5.9".to_string());
     }
 
     #[test]
     fn test_parse_range_mixed_ids() {
         let res = Cli::parse_id_range("1..5.9");
+        let res = res.unwrap_or_default();
+        assert_eq!(res, "1,2,3,4,5.9".to_string());
+
+        let res = Cli::parse_id_range("5.9..1");
         let res = res.unwrap_or_default();
         assert_eq!(res, "1,2,3,4,5.9".to_string());
     }
